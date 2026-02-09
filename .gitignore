@@ -1,0 +1,16 @@
+# Build outputs
+bin/
+obj/
+publish/
+
+# IDE files
+.vs/
+*.user
+*.suo
+
+# Logs
+crash_log.txt
+*.log
+
+# User settings (saved games are stored with executable)
+*.barbu
