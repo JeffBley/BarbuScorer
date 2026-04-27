@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Windows.Input;
+using System.Windows.Threading;
 using CardGameScorer.Models;
 
 namespace CardGameScorer.ViewModels;
@@ -75,8 +76,12 @@ public class MainViewModel : INotifyPropertyChanged
     // Saved games for load picker
     public ObservableCollection<SavedGameInfo> SavedGames { get; } = new();
 
-    // Double targets with status info (for current bidder)
+    // Double targets with status info (for current bidder) - legacy wizard, retained for save/load compatibility
     public ObservableCollection<DoubleTargetInfo> DoubleTargets { get; } = new();
+
+    // Single-view doubling matrix (replaces the wizard).
+    public ObservableCollection<DoublingMatrixRow> DoublingMatrix { get; } = new();
+    public ObservableCollection<DoublingMatrixHeader> DoublingMatrixHeaders { get; } = new();
 
     // Redouble options for current player (legacy, kept for compatibility)
     public ObservableCollection<DoubleBid> RedoubleOptions { get; } = new();
@@ -592,6 +597,7 @@ public class MainViewModel : INotifyPropertyChanged
             OnPropertyChanged(nameof(IsBidding));
             OnPropertyChanged(nameof(IsEnteringScores));
             OnPropertyChanged(nameof(IsScoreSummary));
+            System.Windows.Input.CommandManager.InvalidateRequerySuggested();
         }
     }
 
@@ -735,10 +741,37 @@ public class MainViewModel : INotifyPropertyChanged
         set { _statusMessage = value; OnPropertyChanged(); }
     }
 
+    private DispatcherTimer? _errorClearTimer;
+
     public string ErrorMessage
     {
         get => _errorMessage;
-        set { _errorMessage = value; OnPropertyChanged(); OnPropertyChanged(nameof(HasError)); }
+        set
+        {
+            _errorMessage = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(HasError));
+            // Auto-dismiss after 5 seconds when an error is shown.
+            _errorClearTimer?.Stop();
+            if (!string.IsNullOrEmpty(value))
+            {
+                _errorClearTimer ??= new DispatcherTimer { Interval = TimeSpan.FromSeconds(5) };
+                _errorClearTimer.Tick -= OnErrorClearTick;
+                _errorClearTimer.Tick += OnErrorClearTick;
+                _errorClearTimer.Start();
+            }
+        }
+    }
+
+    private void OnErrorClearTick(object? sender, EventArgs e)
+    {
+        _errorClearTimer?.Stop();
+        if (!string.IsNullOrEmpty(_errorMessage))
+        {
+            _errorMessage = "";
+            OnPropertyChanged(nameof(ErrorMessage));
+            OnPropertyChanged(nameof(HasError));
+        }
     }
 
     public bool HasError => !string.IsNullOrEmpty(ErrorMessage);
@@ -793,6 +826,7 @@ public class MainViewModel : INotifyPropertyChanged
     public ICommand MaxDoublesCommand { get; }
     public ICommand AcceptRedoubleCommand { get; }
     public ICommand DeclineRedoubleCommand { get; }
+    public ICommand ConfirmBiddingMatrixCommand { get; }
     public ICommand RecordHandCommand { get; }
     public ICommand NewGameCommand { get; }
     public ICommand ToggleDoubleTargetCommand { get; }
@@ -815,6 +849,7 @@ public class MainViewModel : INotifyPropertyChanged
     public ICommand ToggleScoringExplanationCommand { get; }
     public ICommand BackBiddingStepCommand { get; }
     public ICommand SelectContractCommand { get; }
+    public ICommand BackCommand { get; }
     public ICommand ConfirmNewGameCommand { get; }
     public ICommand CancelNewGameCommand { get; }
     public ICommand ConfirmSettingsNewGameCommand { get; }
@@ -836,6 +871,7 @@ public class MainViewModel : INotifyPropertyChanged
         MaxDoublesCommand = new RelayCommand(MaxDoubles);
         AcceptRedoubleCommand = new RelayCommand(AcceptRedouble);
         DeclineRedoubleCommand = new RelayCommand(DeclineRedouble);
+        ConfirmBiddingMatrixCommand = new RelayCommand(ConfirmBiddingMatrix);
         RecordHandCommand = new RelayCommand(RecordHand);
         NewGameCommand = new RelayCommand(() => { IsSettingsMenuOpen = false; ShowNewGameConfirm = true; });
         ConfirmNewGameCommand = new RelayCommand(ConfirmNewGame);
@@ -861,12 +897,13 @@ public class MainViewModel : INotifyPropertyChanged
         CancelEditScoreCommand = new RelayCommand(() => { IsEditingScore = false; RowBeingEdited = null; });
         ConfirmSummaryCommand = new RelayCommand(ConfirmSummary);
         BackToScoreInputCommand = new RelayCommand(BackToScoreInput);
-        BackToBiddingCommand = new RelayCommand(() => ShowRestartBiddingConfirm = true);
+        BackToBiddingCommand = new RelayCommand(BackToBiddingMatrix);
         ConfirmRestartBiddingCommand = new RelayCommand(ConfirmRestartBidding);
         CancelRestartBiddingCommand = new RelayCommand(() => ShowRestartBiddingConfirm = false);
         ToggleScoringExplanationCommand = new RelayCommand(() => ShowScoringExplanation = !ShowScoringExplanation);
         BackBiddingStepCommand = new RelayCommand(BackBiddingStep);
         SelectContractCommand = new RelayCommand<ContractOption>(SelectContract);
+        BackCommand = new RelayCommand(BackForCurrentPhase, CanBackForCurrentPhase);
         OpenFanTanScoringEditorCommand = new RelayCommand(OpenFanTanScoringEditor);
         SaveFanTanScoringCommand = new RelayCommand(SaveFanTanScoring);
         DiscardFanTanScoringCommand = new RelayCommand(DiscardFanTanScoring);
@@ -1758,6 +1795,26 @@ public class MainViewModel : INotifyPropertyChanged
         row.HasBiddingComplete = true;
     }
 
+    /// <summary>
+    /// Clears any doubles/redoubles previously written to the scorecard row
+    /// for the currently selected contract (used when the user backs out of
+    /// bidding and chooses a different contract).
+    /// </summary>
+    private void ClearScorecardDoublesForCurrentContract()
+    {
+        if (CurrentDealer == null || !SelectedContract.HasValue) return;
+        var section = Scorecard.FirstOrDefault(s => s.Dealer.Index == CurrentDealer.Index);
+        if (section == null) return;
+        var row = section.Rows.FirstOrDefault(r => r.Contract == SelectedContract.Value);
+        if (row == null) return;
+        foreach (var cell in row.PlayerCells)
+        {
+            cell.DoubledTargets = new List<string>();
+            cell.RedoubledTargets = new List<string>();
+        }
+        row.HasBiddingComplete = false;
+    }
+
     private void StartBidding()
     {
         if (!SelectedContract.HasValue || CurrentDealer == null) return;
@@ -1765,13 +1822,131 @@ public class MainViewModel : INotifyPropertyChanged
         BiddingState.Reset();
         CurrentPhase = GamePhase.Bidding;
         IsInRedoublePhase = false;
+        IsWaitingForImmediateRedouble = false;
+        CurrentBiddingPlayer = null;
 
-        // Bidding starts with the player after the dealer (clockwise)
-        var firstBidder = GetPlayerByPosition(CurrentDealer.Position.NextClockwise());
-        CurrentBiddingPlayer = firstBidder;
+        BuildDoublingMatrix();
+        StatusMessage = "Bidding: select doubles and redoubles, then confirm.";
+    }
 
-        SetupDoubleTargetsForCurrentBidder();
-        StatusMessage = $"Bidding: {CurrentBiddingPlayer.Name}'s turn to double";
+    /// <summary>
+    /// Builds the single-view doubling matrix. Rows are doublers, columns are targets.
+    /// Diagonal cells are empty. Mandatory doubles (non-dealer must double dealer twice
+    /// across the dealer's 7 contracts) are pre-selected. If the dealer is not allowed
+    /// to initiate doubles, the dealer's row is disabled.
+    /// </summary>
+    private void BuildDoublingMatrix()
+    {
+        DoublingMatrix.Clear();
+        DoublingMatrixHeaders.Clear();
+        if (CurrentDealer == null || Players.Count < 4) return;
+
+        // Order players clockwise starting from the player after the dealer.
+        // Top-to-bottom (and left-to-right) follows the clockwise turn order.
+        var ordered = new List<Player>();
+        var pos = CurrentDealer.Position.NextClockwise();
+        for (int i = 0; i < 4; i++)
+        {
+            ordered.Add(GetPlayerByPosition(pos));
+            pos = pos.NextClockwise();
+        }
+
+        foreach (var p in ordered)
+        {
+            DoublingMatrixHeaders.Add(new DoublingMatrixHeader { Player = p });
+        }
+
+        var dealer = CurrentDealer;
+
+        foreach (var doubler in ordered)
+        {
+            var row = new DoublingMatrixRow { Doubler = doubler };
+
+            foreach (var target in ordered)
+            {
+                var cell = new DoublingMatrixCell { Doubler = doubler, Target = target };
+
+                if (cell.IsEmpty)
+                {
+                    cell.IsDoubleEnabled = false;
+                    row.Cells.Add(cell);
+                    continue;
+                }
+
+                // Mandatory: non-dealer doubling the dealer when remaining games == doubles still needed.
+                bool isDealerRow = doubler.Index == dealer.Index;
+                if (!isDealerRow && target.Index == dealer.Index)
+                {
+                    int currentDoubleCount = GetDoubleCountForDealerPair(doubler, dealer);
+                    int doublesNeeded = 2 - currentDoubleCount;
+                    int gamesRemainingForDealer = 7 - dealer.DealtContracts.Count;
+                    if (gamesRemainingForDealer <= doublesNeeded && doublesNeeded > 0)
+                    {
+                        cell.IsMandatory = true;
+                        cell.IsDouble = true;
+                    }
+                }
+
+                row.Cells.Add(cell);
+            }
+
+            row.MaxCommand = new RelayCommand(() => MaxDoublesForRow(row));
+            DoublingMatrix.Add(row);
+        }
+    }
+
+    private void MaxDoublesForRow(DoublingMatrixRow row)
+    {
+        if (row == null) return;
+        foreach (var cell in row.Cells)
+        {
+            if (cell.IsEmpty || !cell.IsDoubleEnabled) continue;
+            cell.IsDouble = true;
+        }
+    }
+
+    private void ConfirmBiddingMatrix()
+    {
+        if (CurrentDealer == null) return;
+
+        // Validate any mandatory cells were not unchecked.
+        foreach (var row in DoublingMatrix)
+        {
+            foreach (var cell in row.Cells)
+            {
+                if (cell.IsMandatory && !cell.IsDouble)
+                {
+                    ErrorMessage = $"{cell.Doubler.Name} must double {cell.Target.Name} (mandatory).";
+                    return;
+                }
+            }
+        }
+
+        // Translate matrix selections into BiddingState.Doubles in clockwise order.
+        // Reassign the underlying list so the bound ItemsControl fully rebuilds (no stale rows).
+        var newDoubles = new List<DoubleBid>();
+        foreach (var row in DoublingMatrix)
+        {
+            foreach (var cell in row.Cells)
+            {
+                if (cell.IsEmpty || !cell.IsDouble) continue;
+                newDoubles.Add(new DoubleBid
+                {
+                    Doubler = cell.Doubler,
+                    Target = cell.Target,
+                    IsRedoubled = cell.IsRedouble
+                });
+            }
+        }
+        BiddingState.Doubles = newDoubles;
+        BiddingState.NotifyDoublesChanged();
+
+        // Mark all players as having completed their turn so any legacy logic remains consistent.
+        BiddingState.PlayersWhoHaveDoubled.Clear();
+        foreach (var p in Players) BiddingState.PlayersWhoHaveDoubled.Add(p);
+
+        ErrorMessage = "";
+        CompleteBidding();
     }
 
     private void SetupDoubleTargetsForCurrentBidder()
@@ -1954,6 +2129,10 @@ public class MainViewModel : INotifyPropertyChanged
         // If no history, go back to contract selection
         if (!BiddingState.CanGoBack)
         {
+            // Clear any doubles that were already written to the scorecard for the
+            // currently-selected contract — otherwise switching to a different game
+            // leaves stale doubles on the abandoned row.
+            ClearScorecardDoublesForCurrentContract();
             BiddingState.Reset();
             SelectedContract = null;
             foreach (var opt in AllContractOptions)
@@ -2070,7 +2249,7 @@ public class MainViewModel : INotifyPropertyChanged
         CurrentPendingRedouble = null;
         CurrentPhase = GamePhase.EnteringScores;
         
-        StatusMessage = "Bidding complete. Enter scores below.";
+        StatusMessage = "";
         ErrorMessage = "";
         
         // Initialize Ravage City player selections if applicable
@@ -2126,6 +2305,9 @@ public class MainViewModel : INotifyPropertyChanged
         option.IsSelected = true;
         
         SelectedContract = option.Type;
+
+        // Single-click: jump straight into bidding.
+        StartBidding();
     }
 
     private void RecordHand()
@@ -2296,6 +2478,47 @@ public class MainViewModel : INotifyPropertyChanged
     {
         CurrentPhase = GamePhase.EnteringScores;
         StatusMessage = "Enter scores for each player";
+    }
+
+    private bool CanBackForCurrentPhase()
+    {
+        return CurrentPhase == GamePhase.Bidding
+            || CurrentPhase == GamePhase.EnteringScores
+            || CurrentPhase == GamePhase.ScoreSummary;
+    }
+
+    private void BackForCurrentPhase()
+    {
+        switch (CurrentPhase)
+        {
+            case GamePhase.Bidding:
+                BackBiddingStep();
+                break;
+            case GamePhase.EnteringScores:
+                BackToBiddingMatrix();
+                break;
+            case GamePhase.ScoreSummary:
+                BackToScoreInput();
+                break;
+        }
+    }
+
+    private void BackToBiddingMatrix()
+    {
+        if (CurrentDealer == null) return;
+        // Return straight to the bidding matrix while keeping the current
+        // matrix selections so the user can simply tweak them.
+        ShowRestartBiddingConfirm = false;
+        ErrorMessage = "";
+        CurrentPhase = GamePhase.Bidding;
+        IsInRedoublePhase = false;
+        IsWaitingForImmediateRedouble = false;
+        CurrentBiddingPlayer = null;
+        StatusMessage = "Bidding: select doubles and redoubles, then confirm.";
+        if (DoublingMatrix.Count == 0)
+        {
+            BuildDoublingMatrix();
+        }
     }
 
     private void ConfirmRestartBidding()

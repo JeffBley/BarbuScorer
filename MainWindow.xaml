@@ -153,7 +153,7 @@
                     <Image Source="Assets/BarbuPhoto.png" Width="120" Height="120" 
                            HorizontalAlignment="Center" Margin="0,0,0,15"/>
                     <TextBlock Text="Barbu Scorer" FontSize="{Binding TitleFontSize}" FontWeight="Bold" 
-                               Foreground="#f5c2e7" HorizontalAlignment="Center" Margin="0,0,0,10"/>
+                               Foreground="#cdd6f4" HorizontalAlignment="Center" Margin="0,0,0,10"/>
                     <TextBlock Text="Enter player names for each position" 
                                Foreground="#a6adc8" HorizontalAlignment="Center" Margin="0,0,0,30"/>
                     
@@ -164,7 +164,7 @@
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
                         <TextBlock Grid.Column="0" Text="Game Name:" FontWeight="SemiBold" 
-                                   VerticalAlignment="Center" Foreground="#a6e3a1"/>
+                                   VerticalAlignment="Center" Foreground="#a6adc8"/>
                         <TextBox Grid.Column="1" Text="{Binding GameName, UpdateSourceTrigger=PropertyChanged}" Margin="10,0,0,0"/>
                     </Grid>
                     
@@ -185,19 +185,19 @@
                         </Grid.RowDefinitions>
                         
                         <TextBlock Grid.Row="0" Grid.Column="0" Text="West:" FontWeight="SemiBold" 
-                                   VerticalAlignment="Center" Foreground="#f9e2af"/>
+                                   VerticalAlignment="Center" Foreground="#a6adc8"/>
                         <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding WestName, UpdateSourceTrigger=PropertyChanged}" Margin="10,0,0,0"/>
                         
                         <TextBlock Grid.Row="2" Grid.Column="0" Text="North:" FontWeight="SemiBold" 
-                                   VerticalAlignment="Center" Foreground="#f9e2af"/>
+                                   VerticalAlignment="Center" Foreground="#a6adc8"/>
                         <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding NorthName, UpdateSourceTrigger=PropertyChanged}" Margin="10,0,0,0"/>
                         
                         <TextBlock Grid.Row="4" Grid.Column="0" Text="East:" FontWeight="SemiBold" 
-                                   VerticalAlignment="Center" Foreground="#f9e2af"/>
+                                   VerticalAlignment="Center" Foreground="#a6adc8"/>
                         <TextBox Grid.Row="4" Grid.Column="1" Text="{Binding EastName, UpdateSourceTrigger=PropertyChanged}" Margin="10,0,0,0"/>
                         
                         <TextBlock Grid.Row="6" Grid.Column="0" Text="South:" FontWeight="SemiBold" 
-                                   VerticalAlignment="Center" Foreground="#f9e2af"/>
+                                   VerticalAlignment="Center" Foreground="#a6adc8"/>
                         <TextBox Grid.Row="6" Grid.Column="1" Text="{Binding SouthName, UpdateSourceTrigger=PropertyChanged}" Margin="10,0,0,0"/>
                     </Grid>
                     
@@ -236,13 +236,7 @@
                 
                 <StackPanel Grid.Column="1" HorizontalAlignment="Center">
                     <TextBlock Text="Barbu Scorer" FontSize="{Binding HugeFontSize}" FontWeight="Bold" 
-                               Foreground="#89b4fa" HorizontalAlignment="Center"/>
-                    
-                    <!-- Error Message -->
-                    <Border Background="#f38ba8" CornerRadius="5" Padding="10" Margin="0,10,0,0"
-                            Visibility="{Binding HasError, Converter={StaticResource BoolToVis}}">
-                        <TextBlock Text="{Binding ErrorMessage}" Foreground="#1e1e2e" TextWrapping="Wrap"/>
-                    </Border>
+                               Foreground="#cdd6f4" HorizontalAlignment="Center"/>
                 </StackPanel>
                 
                 <!-- Settings Gear Button -->
@@ -447,116 +441,6 @@
                 
                 <!-- ==================== TAB 1: CURRENT GAME ==================== -->
                 <TabItem Header="Current Game">
-                    <Border Background="#1e1e2e" Padding="0,15,0,0" MaxWidth="850" HorizontalAlignment="Center">
-                        <ScrollViewer VerticalScrollBarVisibility="Auto">
-                            <StackPanel>
-                                <!-- Player Scores -->
-                                <TextBlock Text="Player Scores" FontSize="{Binding XXLargeFontSize}" FontWeight="Bold" 
-                                           Foreground="#89b4fa" Margin="0,0,0,15"/>
-                                
-                                <ItemsControl ItemsSource="{Binding Players}">
-                                    <ItemsControl.ItemsPanel>
-                                        <ItemsPanelTemplate>
-                                            <UniformGrid Rows="1"/>
-                                        </ItemsPanelTemplate>
-                                    </ItemsControl.ItemsPanel>
-                                    <ItemsControl.ItemTemplate>
-                                        <DataTemplate>
-                                            <Border Background="#313244" CornerRadius="10" Padding="15" Margin="0,0,10,15">
-                                                <StackPanel>
-                                                    <TextBlock Text="{Binding Name}" FontSize="{Binding DataContext.XXLargeFontSize, RelativeSource={RelativeSource AncestorType=Window}}" FontWeight="Bold" Foreground="#89b4fa"/>
-                                                    <TextBlock Text="{Binding PositionName}" Foreground="#a6adc8" FontSize="{Binding DataContext.MediumFontSize, RelativeSource={RelativeSource AncestorType=Window}}"/>
-                                                    <TextBlock Text="{Binding TotalScore}" FontSize="{Binding DataContext.TitleFontSize, RelativeSource={RelativeSource AncestorType=Window}}" FontWeight="Bold" 
-                                                               Foreground="#a6e3a1" Margin="0,10,0,0"/>
-                                                    <TextBlock Foreground="#6c7086" FontSize="{Binding DataContext.SmallFontSize, RelativeSource={RelativeSource AncestorType=Window}}" Margin="0,5,0,0">
-                                                        <Run Text="{Binding RemainingContracts.Count, Mode=OneWay}"/>
-                                                        <Run Text=" games remaining"/>
-                                                    </TextBlock>
-                                                </StackPanel>
-                                            </Border>
-                                        </DataTemplate>
-                                    </ItemsControl.ItemTemplate>
-                                </ItemsControl>
-                                
-                                <!-- Dealer Doubles Matrix -->
-                                <TextBlock Text="Dealer Doubles Tracker" FontSize="{Binding XXLargeFontSize}" FontWeight="Bold" 
-                                           Foreground="#89b4fa" Margin="0,20,0,10"/>
-                                <TextBlock Text="Track doubles: Each player must double each dealer at least twice during the game." 
-                                           Foreground="#a6adc8" FontSize="{Binding MediumFontSize}" Margin="0,0,0,15"/>
-                                
-                                <Border Background="#313244" CornerRadius="10" Padding="15" HorizontalAlignment="Center">
-                                    <Grid>
-                                        <Grid.RowDefinitions>
-                                            <RowDefinition Height="Auto"/>
-                                            <RowDefinition Height="Auto"/>
-                                        </Grid.RowDefinitions>
-                                        
-                                        <!-- Header Row -->
-                                        <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,10">
-                                            <TextBlock Width="175" FontWeight="SemiBold" FontSize="{Binding BaseFontSize}"><Run Text="Doubler ↓ / " Foreground="#f9e2af"/><Run Text="Dealer →" Foreground="#89b4fa"/></TextBlock>
-                                            <ItemsControl ItemsSource="{Binding Players}">
-                                                <ItemsControl.ItemsPanel>
-                                                    <ItemsPanelTemplate>
-                                                        <StackPanel Orientation="Horizontal"/>
-                                                    </ItemsPanelTemplate>
-                                                </ItemsControl.ItemsPanel>
-                                                <ItemsControl.ItemTemplate>
-                                                    <DataTemplate>
-                                                        <TextBlock Text="{Binding Name}" Width="100" FontWeight="SemiBold" 
-                                                                   TextAlignment="Center" Foreground="#89b4fa" FontSize="{Binding DataContext.BaseFontSize, RelativeSource={RelativeSource AncestorType=Window}}"/>
-                                                    </DataTemplate>
-                                                </ItemsControl.ItemTemplate>
-                                            </ItemsControl>
-                                        </StackPanel>
-                                        
-                                        <!-- Data Rows -->
-                                        <ItemsControl Grid.Row="1" ItemsSource="{Binding DealerDoubleMatrix}">
-                                            <ItemsControl.ItemTemplate>
-                                                <DataTemplate>
-                                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
-                                                        <TextBlock Text="{Binding Doubler.Name}" Width="175" VerticalAlignment="Center" Foreground="#f9e2af" FontSize="{Binding DataContext.BaseFontSize, RelativeSource={RelativeSource AncestorType=Window}}"/>
-                                                        <ItemsControl ItemsSource="{Binding DoubleCounts}">
-                                                            <ItemsControl.ItemsPanel>
-                                                                <ItemsPanelTemplate>
-                                                                    <StackPanel Orientation="Horizontal"/>
-                                                                </ItemsPanelTemplate>
-                                                            </ItemsControl.ItemsPanel>
-                                                            <ItemsControl.ItemTemplate>
-                                                                <DataTemplate>
-                                                                    <Border Width="100" Padding="5" Margin="0,0,0,0">
-                                                                        <TextBlock Text="{Binding DisplayText}" TextAlignment="Center"
-                                                                                   FontWeight="SemiBold" FontSize="{Binding DataContext.BaseFontSize, RelativeSource={RelativeSource AncestorType=Window}}">
-                                                                            <TextBlock.Style>
-                                                                                <Style TargetType="TextBlock">
-                                                                                    <Setter Property="Foreground" Value="#f38ba8"/>
-                                                                                    <Style.Triggers>
-                                                                                        <DataTrigger Binding="{Binding ColorCategory}" Value="1">
-                                                                                            <Setter Property="Foreground" Value="#f9e2af"/>
-                                                                                        </DataTrigger>
-                                                                                        <DataTrigger Binding="{Binding ColorCategory}" Value="2">
-                                                                                            <Setter Property="Foreground" Value="#a6e3a1"/>
-                                                                                        </DataTrigger>
-                                                                                    </Style.Triggers>
-                                                                                </Style>
-                                                                            </TextBlock.Style>
-                                                                        </TextBlock>
-                                                                    </Border>
-                                                                </DataTemplate>
-                                                            </ItemsControl.ItemTemplate>
-                                                        </ItemsControl>
-                                                    </StackPanel>
-                                                </DataTemplate>
-                                            </ItemsControl.ItemTemplate>
-                                        </ItemsControl>
-                                    </Grid>
-                                </Border>
-                            </StackPanel>
-                        </ScrollViewer>
-                    </Border>
-                </TabItem>
-                
-                <!-- ==================== TAB 2: SCORING ==================== -->
-                <TabItem Header="Scoring">
                     <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                     <Border Background="#1e1e2e" Padding="0,15,0,0" MaxWidth="850" HorizontalAlignment="Center">
                         <Grid>
@@ -566,33 +450,43 @@
                                 <RowDefinition Height="Auto"/>
                             </Grid.RowDefinitions>
                             
-                            <!-- Status Message -->
+                            <!-- Status Message (hidden — game name shows in panel header) -->
                             <TextBlock Grid.Row="0" Text="{Binding StatusMessage}" Foreground="#a6adc8" 
-                                       TextWrapping="Wrap" Margin="0,0,0,15"/>
+                                       TextWrapping="Wrap" Margin="0,0,0,15" Visibility="Collapsed"/>
                             
                             <!-- Main Content -->
                             <Grid Grid.Row="1">
                 
                 <!-- Game Flow Panel -->
-                <Border Background="#313244" CornerRadius="10" Padding="20">
+                <Border Background="#313244" CornerRadius="10" Padding="20"
+                        Width="800" HorizontalAlignment="Center">
                     <Grid>
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="*"/>
                             <RowDefinition Height="Auto"/>
                         </Grid.RowDefinitions>
+
+                        <!-- Top-right Back button (shared across phases) -->
+                        <Button Grid.Row="0" Grid.RowSpan="3" Content="Back"
+                                Command="{Binding BackCommand}"
+                                Background="#6c7086" Foreground="#cdd6f4"
+                                Padding="12,4" FontWeight="SemiBold"
+                                HorizontalAlignment="Right" VerticalAlignment="Top"
+                                Panel.ZIndex="10"
+                                Visibility="{Binding IsSelectingContract, Converter={StaticResource InverseBoolToVis}}"/>
                         
                         <!-- Phase: Selecting Contract -->
                         <StackPanel Grid.Row="0" Grid.RowSpan="2"
                                     Visibility="{Binding IsSelectingContract, Converter={StaticResource BoolToVis}}">
-                            <TextBlock FontSize="{Binding XLargeFontSize}" Foreground="#89b4fa" Margin="0,0,0,20">
+                            <TextBlock FontSize="{Binding XLargeFontSize}" Foreground="#cdd6f4" Margin="0,0,0,20">
                                 <Run Text="{Binding DealerNamePossessive, Mode=OneWay}" FontWeight="Bold"/>
                                 <Run Text="{Binding DealerTurnSuffix, Mode=OneWay}" FontWeight="SemiBold"/>
                             </TextBlock>
                             
                             <TextBlock Text="Select a game:" Margin="0,0,0,12"/>
                             
-                            <ItemsControl ItemsSource="{Binding AllContractOptions}" Margin="0,0,0,15">
+                            <ItemsControl ItemsSource="{Binding AllContractOptions}">
                                 <ItemsControl.ItemsPanel>
                                     <ItemsPanelTemplate>
                                         <StackPanel Orientation="Vertical"/>
@@ -662,136 +556,149 @@
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
-                            
-                            <TextBlock Text="{Binding ContractDescription}" Foreground="#a6adc8" 
-                                       FontStyle="Italic" Margin="0,0,0,20"/>
-                            
-                            <Button Content="Start Bid" Command="{Binding StartBidCommand}" 
-                                    IsEnabled="{Binding CanStartBid}" HorizontalAlignment="Left"/>
                         </StackPanel>
                         
-                        <!-- Phase: Bidding (Doubling) -->
+                        <!-- Phase: Bidding (Single-View Doubling Matrix) -->
                         <StackPanel Grid.Row="0" Grid.RowSpan="2"
                                     Visibility="{Binding IsBidding, Converter={StaticResource BoolToVis}}">
-                            
-                            <!-- Doubling Phase -->
-                            <StackPanel Visibility="{Binding IsInDoublingPhase, Converter={StaticResource BoolToVis}}">
-                                <TextBlock Text="{Binding CurrentBiddingPlayerDisplay}" FontSize="{Binding XLargeFontSize}" 
-                                           FontWeight="SemiBold" Foreground="#f9e2af" Margin="0,0,0,20"/>
-                                
-                                <TextBlock Text="Choose players to double (or skip):" Margin="0,0,0,15"/>
-                                
-                                <ItemsControl ItemsSource="{Binding DoubleTargets}">
+                            <TextBlock Text="Bidding: Doubles &amp; Redoubles"
+                                       FontSize="{Binding XLargeFontSize}"
+                                       FontWeight="SemiBold" Foreground="#cdd6f4" Margin="0,0,0,15"/>
+
+                            <!-- Header row: empty corner cell, then one column per player, then spacer for Max button -->
+                            <Grid Margin="0,0,0,4">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="170"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="110"/>
+                                </Grid.ColumnDefinitions>
+                                <ItemsControl Grid.Column="1" ItemsSource="{Binding DoublingMatrixHeaders}">
                                     <ItemsControl.ItemsPanel>
                                         <ItemsPanelTemplate>
-                                            <WrapPanel Orientation="Horizontal"/>
+                                            <UniformGrid Rows="1"/>
                                         </ItemsPanelTemplate>
                                     </ItemsControl.ItemsPanel>
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate>
-                                            <Border Margin="0,0,10,10">
-                                                <ToggleButton Style="{StaticResource ToggleButtonStyle}"
-                                                              IsEnabled="{Binding IsClickable}"
-                                                              IsChecked="{Binding IsSelected}"
-                                                              Click="DoubleTarget_Click" Tag="{Binding}"
-                                                              MinWidth="120">
-                                                    <StackPanel>
-                                                        <TextBlock Text="{Binding Player.Name}" FontSize="{Binding DataContext.LargeFontSize, RelativeSource={RelativeSource AncestorType=Window}}"
-                                                                   HorizontalAlignment="Center"/>
-                                                        <TextBlock Text="Dealer" FontSize="{Binding DataContext.SmallFontSize, RelativeSource={RelativeSource AncestorType=Window}}" Foreground="#f9e2af"
-                                                                   HorizontalAlignment="Center"
-                                                                   Visibility="{Binding IsDealer, Converter={StaticResource BoolToVis}}"/>
-                                                        <TextBlock Text="{Binding StatusText}" 
-                                                                   FontSize="{Binding DataContext.SmallFontSize, RelativeSource={RelativeSource AncestorType=Window}}" 
-                                                                   FontWeight="Bold"
-                                                                   HorizontalAlignment="Center">
-                                                            <TextBlock.Style>
-                                                                <Style TargetType="TextBlock">
-                                                                    <Setter Property="Foreground" Value="#f38ba8"/>
-                                                                    <Style.Triggers>
-                                                                        <DataTrigger Binding="{Binding IsMandatory}" Value="True">
-                                                                            <Setter Property="Foreground" Value="#fab387"/>
-                                                                        </DataTrigger>
-                                                                    </Style.Triggers>
-                                                                </Style>
-                                                            </TextBlock.Style>
-                                                        </TextBlock>
-                                                    </StackPanel>
-                                                </ToggleButton>
+                                            <Border Background="#1f3a5f" Margin="2,0" Padding="8,10">
+                                                <TextBlock Text="{Binding Label}"
+                                                           Foreground="White" FontWeight="Bold"
+                                                           FontSize="{Binding DataContext.LargeFontSize, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                           HorizontalAlignment="Center"/>
                                             </Border>
                                         </DataTemplate>
                                     </ItemsControl.ItemTemplate>
                                 </ItemsControl>
-                                
-                                <StackPanel Margin="0,20,0,0">
-                                    <Button Content="MAX" Command="{Binding MaxDoublesCommand}" 
-                                            Background="#fab387" Foreground="#1e1e2e" Margin="0,0,0,10"
-                                            HorizontalAlignment="Center"/>
-                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,50" HorizontalAlignment="Center">
-                                        <Button Content="Skip" Command="{Binding SkipDoubleCommand}" 
-                                                Background="#6c7086" Margin="0,0,10,0"/>
-                                        <Button Content="Confirm" Command="{Binding ConfirmDoublesCommand}"/>
-                                    </StackPanel>
-                                    <Button Content="Back" Command="{Binding BackBiddingStepCommand}" 
-                                            Background="#6c7086" HorizontalAlignment="Left"/>
-                                </StackPanel>
-                            </StackPanel>
-                            
-                            <!-- Immediate Redouble Response -->
-                            <StackPanel Visibility="{Binding IsWaitingForImmediateRedouble, Converter={StaticResource BoolToVis}}">
-                                <Border Background="#45475a" CornerRadius="10" Padding="20" Margin="0,0,0,20">
-                                    <StackPanel>
-                                        <TextBlock Text="{Binding ImmediateRedoubleDisplay}" FontSize="{Binding XLargeFontSize}" 
-                                                   FontWeight="SemiBold" Foreground="#fab387" 
-                                                   TextWrapping="Wrap" Margin="0,0,0,20"/>
-                                        
-                                        <TextBlock Text="Do you want to redouble?" Margin="0,0,0,15"/>
-                                        
-                                        <StackPanel Orientation="Horizontal">
-                                            <Button Content="Yes, Redouble!" 
-                                                    Command="{Binding AcceptRedoubleCommand}" 
-                                                    Background="#fab387" Margin="0,0,15,0"
-                                                    Padding="25,12"/>
-                                            <Button Content="No, Decline" 
-                                                    Command="{Binding DeclineRedoubleCommand}" 
-                                                    Background="#6c7086"
-                                                    Padding="25,12"/>
-                                        </StackPanel>
-                                    </StackPanel>
-                                </Border>
+                            </Grid>
+
+                            <!-- Matrix rows -->
+                            <ItemsControl ItemsSource="{Binding DoublingMatrix}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid Margin="0,2">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="170"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="110"/>
+                                            </Grid.ColumnDefinitions>
+
+                                            <!-- Row label -->
+                                            <Border Grid.Column="0" Background="#313244" Padding="10,12" Margin="0,0,2,0">
+                                                <TextBlock Text="{Binding DoublerLabel}"
+                                                           Foreground="#cdd6f4"
+                                                           FontWeight="SemiBold"
+                                                           FontSize="{Binding DataContext.LargeFontSize, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                           VerticalAlignment="Center"/>
+                                            </Border>
+
+                                            <!-- Cells -->
+                                            <ItemsControl Grid.Column="1" ItemsSource="{Binding Cells}">
+                                                <ItemsControl.ItemsPanel>
+                                                    <ItemsPanelTemplate>
+                                                        <UniformGrid Rows="1"/>
+                                                    </ItemsPanelTemplate>
+                                                </ItemsControl.ItemsPanel>
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <Border Background="#3a3a52" Margin="2,0" Padding="6,8">
+                                                            <Grid>
+                                                                <!-- Empty diagonal cell -->
+                                                                <TextBlock Text="—"
+                                                                           Foreground="#585b70"
+                                                                           HorizontalAlignment="Center"
+                                                                           VerticalAlignment="Center"
+                                                                           FontSize="{Binding DataContext.LargeFontSize, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                           Visibility="{Binding IsEmpty, Converter={StaticResource BoolToVis}}"/>
+                                                                <StackPanel Orientation="Horizontal"
+                                                                            HorizontalAlignment="Center"
+                                                                            VerticalAlignment="Center"
+                                                                            Visibility="{Binding IsNotEmpty, Converter={StaticResource BoolToVis}}">
+                                                                    <StackPanel Orientation="Vertical" VerticalAlignment="Top" Margin="0,0,18,0">
+                                                                        <CheckBox IsChecked="{Binding IsDouble, Mode=TwoWay}"
+                                                                                  IsEnabled="{Binding IsDoubleEnabled}"
+                                                                                  ToolTip="Double"
+                                                                                  HorizontalAlignment="Center">
+                                                                            <CheckBox.LayoutTransform>
+                                                                                <ScaleTransform ScaleX="1.6" ScaleY="1.6"/>
+                                                                            </CheckBox.LayoutTransform>
+                                                                        </CheckBox>
+                                                                        <TextBlock Text="Dbl"
+                                                                                   FontSize="10"
+                                                                                   Foreground="#a6adc8"
+                                                                                   HorizontalAlignment="Center"
+                                                                                   Margin="0,4,0,0"/>
+                                                                    </StackPanel>
+                                                                    <StackPanel Orientation="Vertical" VerticalAlignment="Top">
+                                                                        <CheckBox IsChecked="{Binding IsRedouble, Mode=TwoWay}"
+                                                                                  IsEnabled="{Binding IsRedoubleEnabled}"
+                                                                                  ToolTip="Redouble (enabled after double is checked)"
+                                                                                  HorizontalAlignment="Center">
+                                                                            <CheckBox.LayoutTransform>
+                                                                                <ScaleTransform ScaleX="1.6" ScaleY="1.6"/>
+                                                                            </CheckBox.LayoutTransform>
+                                                                        </CheckBox>
+                                                                        <TextBlock Text="Re-Dbl"
+                                                                                   FontSize="10"
+                                                                                   Foreground="#a6adc8"
+                                                                                   HorizontalAlignment="Center"
+                                                                                   Margin="0,4,0,0"/>
+                                                                    </StackPanel>
+                                                                </StackPanel>
+                                                            </Grid>
+                                                        </Border>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+
+                                            <!-- Max button outside the table -->
+                                            <Button Grid.Column="2" Content="Max"
+                                                    Command="{Binding MaxCommand}"
+                                                    Background="#fab387" Foreground="#1e1e2e"
+                                                    Margin="8,0,0,0"
+                                                    Padding="14,8"
+                                                    HorizontalAlignment="Stretch"
+                                                    VerticalAlignment="Stretch"/>
+                                        </Grid>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+
+                            <!-- Action buttons -->
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,25,0,20">
+                                <Button Content="Confirm Bidding" Command="{Binding ConfirmBiddingMatrixCommand}"
+                                        Background="#a6e3a1" Foreground="#1e1e2e"
+                                        Padding="25,10" FontWeight="Bold"/>
                             </StackPanel>
                         </StackPanel>
+                        
                         
                         <!-- Phase: Entering Scores -->
                         <StackPanel Grid.Row="0" Grid.RowSpan="2"
                                     Visibility="{Binding IsEnteringScores, Converter={StaticResource BoolToVis}}">
-                            <TextBlock FontSize="{Binding XLargeFontSize}" FontWeight="SemiBold" Margin="0,0,0,15" Foreground="#a6e3a1">
-                                <Run Text="Enter Scores for "/><Run Text="{Binding SelectedContractName, Mode=OneWay}"/>
-                            </TextBlock>
-                            
-                            <!-- Doubles Summary -->
-                            <Border Background="#45475a" CornerRadius="8" Padding="15" Margin="0,0,0,15">
-                                <StackPanel>
-                                    <TextBlock Text="Doubles for this round:" FontWeight="SemiBold" Margin="0,0,0,10"/>
-                                    <ItemsControl ItemsSource="{Binding BiddingState.Doubles}">
-                                        <ItemsControl.ItemTemplate>
-                                            <DataTemplate>
-                                                <StackPanel Orientation="Horizontal" Margin="0,2,0,2">
-                                                    <TextBlock Foreground="#cba6f7">
-                                                        <Run Text="{Binding Doubler.Name, Mode=OneWay}"/>
-                                                        <Run Text=" doubled "/>
-                                                        <Run Text="{Binding Target.Name, Mode=OneWay}"/>
-                                                    </TextBlock>
-                                                    <TextBlock Text=" (redoubled)" Foreground="#f38ba8"
-                                                               Visibility="{Binding IsRedoubled, Converter={StaticResource BoolToVis}}"/>
-                                                </StackPanel>
-                                            </DataTemplate>
-                                        </ItemsControl.ItemTemplate>
-                                    </ItemsControl>
-                                    <TextBlock Text="No doubles" Foreground="#6c7086" 
-                                               Visibility="{Binding BiddingState.HasNoDoubles, Converter={StaticResource BoolToVis}}"/>
-                                </StackPanel>
-                            </Border>
+                            <TextBlock Text="{Binding SelectedContractName, Mode=OneWay}"
+                                       FontSize="{Binding XLargeFontSize}" FontWeight="SemiBold"
+                                       Margin="0,0,0,15" Foreground="#a6e3a1"
+                                       HorizontalAlignment="Center"/>
                             
                             <!-- Ace of Hearts dropdown (only for Hearts contract) -->
                             <StackPanel Visibility="{Binding IsHeartsContract, Converter={StaticResource BoolToVis}}"
@@ -810,7 +717,7 @@
                             <StackPanel Visibility="{Binding IsBarbuContract, Converter={StaticResource BoolToVis}}"
                                         Margin="0,0,0,15">
                                 <TextBlock Text="Select who took the King of Hearts" FontSize="{Binding LargeFontSize}" 
-                                           FontWeight="Bold" Foreground="#228B22" Margin="0,0,0,15" TextWrapping="Wrap"/>
+                                           FontWeight="Bold" Foreground="#cdd6f4" Margin="0,0,0,15" TextWrapping="Wrap"/>
                                 <TextBlock Text="Player who won the King of Hearts:" FontWeight="SemiBold" 
                                            Margin="0,0,0,5"/>
                                 <ComboBox ItemsSource="{Binding Players}" 
@@ -825,7 +732,7 @@
                             <StackPanel Visibility="{Binding IsNoLastTwoContract, Converter={StaticResource BoolToVis}}"
                                         Margin="0,0,0,15">
                                 <TextBlock Text="Select who won the last two tricks" FontSize="{Binding LargeFontSize}" 
-                                           FontWeight="Bold" Foreground="#228B22" Margin="0,0,0,15" TextWrapping="Wrap"/>
+                                           FontWeight="Bold" Foreground="#cdd6f4" Margin="0,0,0,15" TextWrapping="Wrap"/>
                                 <TextBlock Text="Player who won the 2nd to last trick:" FontWeight="SemiBold" 
                                            Margin="0,0,0,5"/>
                                 <ComboBox ItemsSource="{Binding Players}" 
@@ -850,7 +757,7 @@
                                         Margin="0,0,0,15">
                                 <TextBlock Text="Select the player(s) who took the most cards in any suit" 
                                            FontSize="{Binding LargeFontSize}" 
-                                           FontWeight="Bold" Foreground="#228B22" Margin="0,0,0,15" TextWrapping="Wrap"/>
+                                           FontWeight="Bold" Foreground="#cdd6f4" Margin="0,0,0,15" TextWrapping="Wrap"/>
                                 <TextBlock Text="{Binding RavageCityScoringDescription}" 
                                            Foreground="#6c7086" Margin="0,0,0,10" FontStyle="Italic"/>
                                 <ItemsControl ItemsSource="{Binding RavageCityPlayerSelections}">
@@ -870,7 +777,7 @@
                                         Margin="0,0,0,15">
                                 <TextBlock Text="Enter Chinese Poker beats (+6 points per beat)" 
                                            FontSize="{Binding LargeFontSize}" 
-                                           FontWeight="Bold" Foreground="#228B22" Margin="0,0,0,15" TextWrapping="Wrap"/>
+                                           FontWeight="Bold" Foreground="#cdd6f4" Margin="0,0,0,15" TextWrapping="Wrap"/>
                                 
                                 <!-- Scoring mode radio buttons -->
                                 <StackPanel Orientation="Horizontal" Margin="0,0,0,15">
@@ -1008,47 +915,79 @@
                             </StackPanel>
                             
                             <StackPanel Orientation="Horizontal" Margin="0,15,0,0">
-                                <Button Content="Back to Bidding" Command="{Binding BackToBiddingCommand}"
-                                        Margin="0,0,15,0">
-                                    <Button.Style>
-                                        <Style TargetType="Button">
-                                            <Setter Property="Background" Value="#6c7086"/>
-                                            <Setter Property="Foreground" Value="#cdd6f4"/>
-                                            <Setter Property="Template">
-                                                <Setter.Value>
-                                                    <ControlTemplate TargetType="Button">
-                                                        <Border Background="{TemplateBinding Background}" Padding="10,5" CornerRadius="3">
-                                                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                                        </Border>
-                                                    </ControlTemplate>
-                                                </Setter.Value>
-                                            </Setter>
-                                            <Style.Triggers>
-                                                <Trigger Property="IsMouseOver" Value="True">
-                                                    <Setter Property="Foreground" Value="#1e1e2e"/>
-                                                    <Setter Property="Background" Value="#89b4fa"/>
-                                                </Trigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </Button.Style>
-                                </Button>
                                 <Button Content="Submit Score" Click="RecordHand_Click" 
-                                        Background="#a6e3a1"/>
+                                        Background="#a6e3a1" x:Name="SubmitScoreButton"/>
+                                <!-- Error popup floats below the Submit Score button so layout never shifts; auto-dismisses after 5s. -->
+                                <Popup IsOpen="{Binding HasError, Mode=OneWay}"
+                                       PlacementTarget="{Binding ElementName=SubmitScoreButton}"
+                                       Placement="Bottom"
+                                       AllowsTransparency="True"
+                                       StaysOpen="True"
+                                       HorizontalOffset="-100"
+                                       VerticalOffset="8">
+                                    <Border Background="#f38ba8" CornerRadius="5" Padding="12" MaxWidth="700">
+                                        <TextBlock Text="{Binding ErrorMessage}" Foreground="#1e1e2e"
+                                                   TextWrapping="Wrap" FontWeight="SemiBold"/>
+                                    </Border>
+                                </Popup>
                             </StackPanel>
+                            
+                            <!-- Doubles Summary -->
+                            <Border Background="#45475a" CornerRadius="8" Padding="15" Margin="0,15,0,0">
+                                <StackPanel>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" Text="Doubles for this round:" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                        <ToggleButton Grid.Column="1" x:Name="DoublesToggle"
+                                                      Background="#89b4fa" Foreground="#1e1e2e"
+                                                      BorderThickness="0" Padding="12,4" Cursor="Hand">
+                                            <ToggleButton.Style>
+                                                <Style TargetType="ToggleButton">
+                                                    <Setter Property="Content" Value="Show"/>
+                                                    <Style.Triggers>
+                                                        <Trigger Property="IsChecked" Value="True">
+                                                            <Setter Property="Content" Value="Hide"/>
+                                                        </Trigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </ToggleButton.Style>
+                                        </ToggleButton>
+                                    </Grid>
+                                    <StackPanel Margin="0,10,0,0"
+                                                Visibility="{Binding IsChecked, ElementName=DoublesToggle, Converter={StaticResource BoolToVis}}">
+                                        <ItemsControl ItemsSource="{Binding BiddingState.Doubles}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <StackPanel Orientation="Vertical" Margin="0,2,0,2">
+                                                        <TextBlock Foreground="#cdd6f4"><Run Text="{Binding Doubler.Name, Mode=OneWay}"/><Run Text=" doubled "/><Run Text="{Binding Target.Name, Mode=OneWay}"/></TextBlock>
+                                                        <TextBlock Foreground="#a6adc8" Margin="15,2,0,0"
+                                                                   Visibility="{Binding IsRedoubled, Converter={StaticResource BoolToVis}}"><Run Text="{Binding Target.Name, Mode=OneWay}"/><Run Text=" redoubled "/><Run Text="{Binding Doubler.Name, Mode=OneWay}"/></TextBlock>
+                                                    </StackPanel>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                        <TextBlock Text="No doubles" Foreground="#6c7086" 
+                                                   Visibility="{Binding BiddingState.HasNoDoubles, Converter={StaticResource BoolToVis}}"/>
+                                    </StackPanel>
+                                </StackPanel>
+                            </Border>
                         </StackPanel>
                         
                         <!-- Phase: Score Summary -->
                         <StackPanel Grid.Row="0" Grid.RowSpan="2"
                                     Visibility="{Binding IsScoreSummary, Converter={StaticResource BoolToVis}}">
                             <TextBlock Text="Score Summary" FontSize="{Binding XLargeFontSize}" FontWeight="SemiBold" 
-                                       Foreground="#f5c2e7" Margin="0,0,0,15"/>
+                                       Foreground="#cdd6f4" Margin="0,0,0,15"/>
                             
                             <!-- Player Score Tiles - 4 in a row, collapsing to 2x2 (W/N top, E/S bottom) -->
                             <UniformGrid Columns="4" Margin="0,0,0,15" x:Name="ScoreTilesGrid">
                                 <!-- Player 1 (West) Tile -->
                                 <Border Background="#313244" CornerRadius="10" Padding="20" Margin="0,0,10,10" MinWidth="140">
                                     <StackPanel>
-                                        <TextBlock Text="{Binding Players[0].Name}" FontSize="{Binding LargeFontSize}" FontWeight="Bold" Foreground="#89b4fa"/>
+                                        <TextBlock Text="{Binding Players[0].Name}" FontSize="{Binding LargeFontSize}" FontWeight="Bold" Foreground="#cdd6f4"/>
                                         <StackPanel Margin="0,10,0,0">
                                             <TextBlock Text="Before Doubles" FontSize="{Binding SmallFontSize}" Foreground="#6c7086"/>
                                             <TextBlock Text="{Binding SummaryBaseScores[0]}" FontSize="{Binding XXLargeFontSize}" Foreground="#a6adc8"/>
@@ -1063,7 +1002,7 @@
                                 <!-- Player 2 (North) Tile -->
                                 <Border Background="#313244" CornerRadius="10" Padding="20" Margin="0,0,10,10" MinWidth="140">
                                     <StackPanel>
-                                        <TextBlock Text="{Binding Players[1].Name}" FontSize="{Binding LargeFontSize}" FontWeight="Bold" Foreground="#89b4fa"/>
+                                        <TextBlock Text="{Binding Players[1].Name}" FontSize="{Binding LargeFontSize}" FontWeight="Bold" Foreground="#cdd6f4"/>
                                         <StackPanel Margin="0,10,0,0">
                                             <TextBlock Text="Before Doubles" FontSize="{Binding SmallFontSize}" Foreground="#6c7086"/>
                                             <TextBlock Text="{Binding SummaryBaseScores[1]}" FontSize="{Binding XXLargeFontSize}" Foreground="#a6adc8"/>
@@ -1078,7 +1017,7 @@
                                 <!-- Player 3 (East) Tile -->
                                 <Border Background="#313244" CornerRadius="10" Padding="20" Margin="0,0,10,10" MinWidth="140">
                                     <StackPanel>
-                                        <TextBlock Text="{Binding Players[2].Name}" FontSize="{Binding LargeFontSize}" FontWeight="Bold" Foreground="#89b4fa"/>
+                                        <TextBlock Text="{Binding Players[2].Name}" FontSize="{Binding LargeFontSize}" FontWeight="Bold" Foreground="#cdd6f4"/>
                                         <StackPanel Margin="0,10,0,0">
                                             <TextBlock Text="Before Doubles" FontSize="{Binding SmallFontSize}" Foreground="#6c7086"/>
                                             <TextBlock Text="{Binding SummaryBaseScores[2]}" FontSize="{Binding XXLargeFontSize}" Foreground="#a6adc8"/>
@@ -1093,7 +1032,7 @@
                                 <!-- Player 4 (South) Tile -->
                                 <Border Background="#313244" CornerRadius="10" Padding="20" Margin="0,0,10,10" MinWidth="140">
                                     <StackPanel>
-                                        <TextBlock Text="{Binding Players[3].Name}" FontSize="{Binding LargeFontSize}" FontWeight="Bold" Foreground="#89b4fa"/>
+                                        <TextBlock Text="{Binding Players[3].Name}" FontSize="{Binding LargeFontSize}" FontWeight="Bold" Foreground="#cdd6f4"/>
                                         <StackPanel Margin="0,10,0,0">
                                             <TextBlock Text="Before Doubles" FontSize="{Binding SmallFontSize}" Foreground="#6c7086"/>
                                             <TextBlock Text="{Binding SummaryBaseScores[3]}" FontSize="{Binding XXLargeFontSize}" Foreground="#a6adc8"/>
@@ -1108,8 +1047,6 @@
                             
                             <!-- Buttons -->
                             <StackPanel Orientation="Horizontal">
-                                <Button Content="Back" Command="{Binding BackToScoreInputCommand}"
-                                        Background="#6c7086" Foreground="#cdd6f4" Margin="0,0,15,0"/>
                                 <Button Content="Confirm Scores" Command="{Binding ConfirmSummaryCommand}"
                                         Background="#a6e3a1"/>
                             </StackPanel>
@@ -1120,13 +1057,120 @@
             </Grid>
             
             <!-- Footer -->
-            <TextBlock Grid.Row="2" Foreground="#6c7086" HorizontalAlignment="Center" Margin="0,15,0,0">
-                <Run Text="Round "/><Run Text="{Binding CurrentHandNumber, Mode=OneWay}"/>
-                <Run Text=" of 28 (7 games × 4 players)"/>
-            </TextBlock>
+            <TextBlock Grid.Row="2" Foreground="#6c7086" HorizontalAlignment="Center" Margin="0,15,0,0"><Run Text="Round "/><Run Text="{Binding CurrentHandNumber, Mode=OneWay}"/><Run Text=" of 28"/></TextBlock>
                         </Grid>
                     </Border>
                     </ScrollViewer>
+                </TabItem>
+                
+                <!-- ==================== TAB 2: GAME TRACKERS ==================== -->
+                <TabItem Header="Game Trackers">
+                    <Border Background="#1e1e2e" Padding="0,15,0,0" MaxWidth="850" HorizontalAlignment="Center">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                            <StackPanel>
+                                <!-- Player Scores -->
+                                <TextBlock Text="Player Scores" FontSize="{Binding XXLargeFontSize}" FontWeight="Bold" 
+                                           Foreground="#cdd6f4" Margin="0,0,0,15"/>
+                                
+                                <ItemsControl ItemsSource="{Binding Players}">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <UniformGrid Rows="1"/>
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border Background="#313244" CornerRadius="10" Padding="15" Margin="0,0,10,15">
+                                                <StackPanel>
+                                                    <TextBlock Text="{Binding Name}" FontSize="{Binding DataContext.XXLargeFontSize, RelativeSource={RelativeSource AncestorType=Window}}" FontWeight="Bold" Foreground="#cdd6f4"/>
+                                                    <TextBlock Text="{Binding PositionName}" Foreground="#a6adc8" FontSize="{Binding DataContext.MediumFontSize, RelativeSource={RelativeSource AncestorType=Window}}"/>
+                                                    <TextBlock Text="{Binding TotalScore}" FontSize="{Binding DataContext.TitleFontSize, RelativeSource={RelativeSource AncestorType=Window}}" FontWeight="Bold" 
+                                                               Foreground="#a6e3a1" Margin="0,10,0,0"/>
+                                                    <TextBlock Foreground="#6c7086" FontSize="{Binding DataContext.SmallFontSize, RelativeSource={RelativeSource AncestorType=Window}}" Margin="0,5,0,0">
+                                                        <Run Text="{Binding RemainingContracts.Count, Mode=OneWay}"/>
+                                                        <Run Text=" games remaining"/>
+                                                    </TextBlock>
+                                                </StackPanel>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                                
+                                <!-- Dealer Doubles Matrix -->
+                                <TextBlock Text="Dealer Doubles Tracker" FontSize="{Binding XXLargeFontSize}" FontWeight="Bold" 
+                                           Foreground="#cdd6f4" Margin="0,20,0,10"/>
+                                <TextBlock Text="Track doubles: Each player must double each dealer at least twice during the game." 
+                                           Foreground="#a6adc8" FontSize="{Binding MediumFontSize}" Margin="0,0,0,15"/>
+                                
+                                <Border Background="#313244" CornerRadius="10" Padding="15" HorizontalAlignment="Center">
+                                    <Grid>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                        </Grid.RowDefinitions>
+                                        
+                                        <!-- Header Row -->
+                                        <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,10">
+                                            <TextBlock Width="175" FontWeight="SemiBold" FontSize="{Binding BaseFontSize}"><Run Text="Doubler ↓ / " Foreground="#f9e2af"/><Run Text="Dealer →" Foreground="#89b4fa"/></TextBlock>
+                                            <ItemsControl ItemsSource="{Binding Players}">
+                                                <ItemsControl.ItemsPanel>
+                                                    <ItemsPanelTemplate>
+                                                        <StackPanel Orientation="Horizontal"/>
+                                                    </ItemsPanelTemplate>
+                                                </ItemsControl.ItemsPanel>
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <TextBlock Text="{Binding Name}" Width="100" FontWeight="SemiBold" 
+                                                                   TextAlignment="Center" Foreground="#89b4fa" FontSize="{Binding DataContext.BaseFontSize, RelativeSource={RelativeSource AncestorType=Window}}"/>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </StackPanel>
+                                        
+                                        <!-- Data Rows -->
+                                        <ItemsControl Grid.Row="1" ItemsSource="{Binding DealerDoubleMatrix}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                                                        <TextBlock Text="{Binding Doubler.Name}" Width="175" VerticalAlignment="Center" Foreground="#f9e2af" FontSize="{Binding DataContext.BaseFontSize, RelativeSource={RelativeSource AncestorType=Window}}"/>
+                                                        <ItemsControl ItemsSource="{Binding DoubleCounts}">
+                                                            <ItemsControl.ItemsPanel>
+                                                                <ItemsPanelTemplate>
+                                                                    <StackPanel Orientation="Horizontal"/>
+                                                                </ItemsPanelTemplate>
+                                                            </ItemsControl.ItemsPanel>
+                                                            <ItemsControl.ItemTemplate>
+                                                                <DataTemplate>
+                                                                    <Border Width="100" Padding="5" Margin="0,0,0,0">
+                                                                        <TextBlock Text="{Binding DisplayText}" TextAlignment="Center"
+                                                                                   FontWeight="SemiBold" FontSize="{Binding DataContext.BaseFontSize, RelativeSource={RelativeSource AncestorType=Window}}">
+                                                                            <TextBlock.Style>
+                                                                                <Style TargetType="TextBlock">
+                                                                                    <Setter Property="Foreground" Value="#f38ba8"/>
+                                                                                    <Style.Triggers>
+                                                                                        <DataTrigger Binding="{Binding ColorCategory}" Value="1">
+                                                                                            <Setter Property="Foreground" Value="#f9e2af"/>
+                                                                                        </DataTrigger>
+                                                                                        <DataTrigger Binding="{Binding ColorCategory}" Value="2">
+                                                                                            <Setter Property="Foreground" Value="#a6e3a1"/>
+                                                                                        </DataTrigger>
+                                                                                    </Style.Triggers>
+                                                                                </Style>
+                                                                            </TextBlock.Style>
+                                                                        </TextBlock>
+                                                                    </Border>
+                                                                </DataTemplate>
+                                                            </ItemsControl.ItemTemplate>
+                                                        </ItemsControl>
+                                                    </StackPanel>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </Grid>
+                                </Border>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </Border>
                 </TabItem>
                 
                 <!-- ==================== TAB 3: SCORE CARD ==================== -->
@@ -1141,7 +1185,7 @@
                             
                             <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,15">
                                 <TextBlock Text="Score Card" FontSize="{Binding XXLargeFontSize}" FontWeight="Bold" 
-                                           Foreground="#89b4fa" VerticalAlignment="Center"/>
+                                           Foreground="#cdd6f4" VerticalAlignment="Center"/>
                                 <StackPanel Orientation="Horizontal" Margin="20,0,0,0" VerticalAlignment="Center">
                                     <Border Background="#f9e2af" CornerRadius="8" Width="16" Height="16" Margin="0,0,5,0"/>
                                     <TextBlock Text="Doubled" Foreground="#a6adc8" FontSize="{Binding MediumFontSize}" VerticalAlignment="Center" Margin="0,0,15,0"/>
@@ -1172,15 +1216,15 @@
                                     </Grid.ColumnDefinitions>
                                     <TextBlock Grid.Column="0" Text="" FontWeight="Bold" Foreground="#a6e3a1" FontSize="{Binding BaseFontSize}"/>
                                     <Border Grid.Column="1" Width="1" Background="#6c7086" Margin="5,0"/>
-                                    <TextBlock Grid.Column="2" Text="{Binding Players[0].NameWithPosition}" FontWeight="Bold" Foreground="#89b4fa" TextAlignment="Center" FontSize="{Binding BaseFontSize}"/>
+                                    <TextBlock Grid.Column="2" Text="{Binding Players[0].NameWithPosition}" FontWeight="Bold" Foreground="#cdd6f4" TextAlignment="Center" FontSize="{Binding BaseFontSize}"/>
                                     <Border Grid.Column="3" Width="1" Background="#6c7086" Margin="5,0"/>
-                                    <TextBlock Grid.Column="4" Text="{Binding Players[1].NameWithPosition}" FontWeight="Bold" Foreground="#89b4fa" TextAlignment="Center" FontSize="{Binding BaseFontSize}"/>
+                                    <TextBlock Grid.Column="4" Text="{Binding Players[1].NameWithPosition}" FontWeight="Bold" Foreground="#cdd6f4" TextAlignment="Center" FontSize="{Binding BaseFontSize}"/>
                                     <Border Grid.Column="5" Width="1" Background="#6c7086" Margin="5,0"/>
-                                    <TextBlock Grid.Column="6" Text="{Binding Players[2].NameWithPosition}" FontWeight="Bold" Foreground="#89b4fa" TextAlignment="Center" FontSize="{Binding BaseFontSize}"/>
+                                    <TextBlock Grid.Column="6" Text="{Binding Players[2].NameWithPosition}" FontWeight="Bold" Foreground="#cdd6f4" TextAlignment="Center" FontSize="{Binding BaseFontSize}"/>
                                     <Border Grid.Column="7" Width="1" Background="#6c7086" Margin="5,0"/>
-                                    <TextBlock Grid.Column="8" Text="{Binding Players[3].NameWithPosition}" FontWeight="Bold" Foreground="#89b4fa" TextAlignment="Center" FontSize="{Binding BaseFontSize}"/>
+                                    <TextBlock Grid.Column="8" Text="{Binding Players[3].NameWithPosition}" FontWeight="Bold" Foreground="#cdd6f4" TextAlignment="Center" FontSize="{Binding BaseFontSize}"/>
                                     <Border Grid.Column="9" Width="1" Background="#6c7086" Margin="5,0"/>
-                                    <TextBlock Grid.Column="10" Text="Check" FontWeight="Bold" Foreground="#cba6f7" TextAlignment="Center" FontSize="{Binding BaseFontSize}"/>
+                                    <TextBlock Grid.Column="10" Text="Check" FontWeight="Bold" Foreground="#a6adc8" TextAlignment="Center" FontSize="{Binding BaseFontSize}"/>
                                 </Grid>
                             </Border>
                             
@@ -1192,7 +1236,7 @@
                                             <StackPanel>
                                                 <!-- Dealer Header -->
                                                 <Border Background="#585b70" Padding="10,8" Margin="0,10,0,1">
-                                                    <TextBlock FontWeight="Bold" Foreground="#a6e3a1" FontSize="{Binding DataContext.BaseFontSize, RelativeSource={RelativeSource AncestorType=Window}}"><Run Text="{Binding Dealer.Name, Mode=OneWay}"/><Run Text="'s Contracts"/></TextBlock>
+                                                    <TextBlock FontWeight="Bold" Foreground="#cdd6f4" FontSize="{Binding DataContext.BaseFontSize, RelativeSource={RelativeSource AncestorType=Window}}"><Run Text="{Binding Dealer.Name, Mode=OneWay}"/><Run Text="'s Contracts ("/><Run Text="{Binding Dealer.PositionInitial, Mode=OneWay}"/><Run Text=")"/></TextBlock>
                                                 </Border>
                                                 
                                                 <!-- Rows for this dealer's contracts -->
@@ -1255,7 +1299,7 @@
                                                                                 </Style.Triggers>
                                                                             </Style>
                                                                         </Button.Style>
-                                                                        <TextBlock Text="{Binding GameName}" VerticalAlignment="Center" Foreground="#89b4fa" FontSize="{Binding DataContext.BaseFontSize, RelativeSource={RelativeSource AncestorType=Window}}">
+                                                                        <TextBlock Text="{Binding GameName}" VerticalAlignment="Center" Foreground="#cdd6f4" FontSize="{Binding DataContext.BaseFontSize, RelativeSource={RelativeSource AncestorType=Window}}">
                                                                             <TextBlock.Style>
                                                                                 <Style TargetType="TextBlock">
                                                                                     <Style.Triggers>
@@ -1480,7 +1524,7 @@
                                                                     
                                                                     <!-- Check Sum -->
                                                                     <TextBlock Grid.Column="10" Text="{Binding CheckSumDisplay}" TextAlignment="Center" VerticalAlignment="Center"
-                                                                               Foreground="#cba6f7" FontWeight="SemiBold" FontSize="{Binding DataContext.BaseFontSize, RelativeSource={RelativeSource AncestorType=Window}}"/>
+                                                                               Foreground="#a6adc8" FontWeight="SemiBold" FontSize="{Binding DataContext.BaseFontSize, RelativeSource={RelativeSource AncestorType=Window}}"/>
                                                                 </Grid>
                                                             </Border>
                                                         </DataTemplate>
@@ -1603,7 +1647,7 @@
                                         <TextBlock Text="Game Variants" FontSize="{Binding XLargeFontSize}" FontWeight="Bold" 
                                                    Foreground="#cdd6f4" Margin="0,0,0,12"/>
                                         
-                                        <TextBlock Text="Game Mode" FontSize="{Binding LargeFontSize}" FontWeight="SemiBold" Foreground="#89b4fa" Margin="0,0,0,6"/>
+                                        <TextBlock Text="Game Mode" FontSize="{Binding LargeFontSize}" FontWeight="SemiBold" Foreground="#cdd6f4" Margin="0,0,0,6"/>
                                         <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
                                             <RadioButton Content="Standard" Foreground="#cdd6f4" FontSize="{Binding BaseFontSize}" Margin="0,0,20,0"
                                                          IsChecked="{Binding IsStandardMode, Mode=TwoWay}" GroupName="GameMode"/>
@@ -1611,7 +1655,7 @@
                                                          IsChecked="{Binding IsSaladeMode, Mode=TwoWay}" GroupName="GameMode"/>
                                         </StackPanel>
                                         
-                                        <TextBlock Text="Contract/Game Names" FontSize="{Binding LargeFontSize}" FontWeight="SemiBold" Foreground="#89b4fa" Margin="0,0,0,6"/>
+                                        <TextBlock Text="Contract/Game Names" FontSize="{Binding LargeFontSize}" FontWeight="SemiBold" Foreground="#cdd6f4" Margin="0,0,0,6"/>
                                         <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
                                             <RadioButton Content="Classic" Foreground="#cdd6f4" FontSize="{Binding BaseFontSize}" Margin="0,0,20,0"
                                                          IsChecked="{Binding IsClassicNames, Mode=TwoWay}" GroupName="ContractNames"/>
@@ -1627,7 +1671,7 @@
                                             </TextBlock>
                                         </StackPanel>
                                         
-                                        <TextBlock Text="Fan Tan/Domino Scoring" FontSize="{Binding LargeFontSize}" FontWeight="SemiBold" Foreground="#89b4fa" Margin="0,0,0,6"/>
+                                        <TextBlock Text="Fan Tan/Domino Scoring" FontSize="{Binding LargeFontSize}" FontWeight="SemiBold" Foreground="#cdd6f4" Margin="0,0,0,6"/>
                                         <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
                                             <TextBlock Text="{Binding FanTanScoringDisplay}" Foreground="#cdd6f4" FontSize="{Binding BaseFontSize}" 
                                                        VerticalAlignment="Center" Margin="0,0,15,0"/>
@@ -1635,7 +1679,7 @@
                                                     Style="{StaticResource SettingsEditButtonStyle}"/>
                                         </StackPanel>
                                         
-                                        <TextBlock Text="Optional Contracts/Games (Standard Barbu only)" FontSize="{Binding LargeFontSize}" FontWeight="SemiBold" Foreground="#89b4fa" Margin="0,0,0,6"/>
+                                        <TextBlock Text="Optional Contracts/Games (Standard Barbu only)" FontSize="{Binding LargeFontSize}" FontWeight="SemiBold" Foreground="#cdd6f4" Margin="0,0,0,6"/>
                                         <StackPanel Margin="0,0,0,6">
                                             <CheckBox Content="Ravage City (8th contract)" Foreground="#cdd6f4" FontSize="{Binding BaseFontSize}"
                                                       IsChecked="{Binding RavageCityEnabled, Mode=TwoWay}" IsEnabled="{Binding NotSaladeMode}"/>
@@ -1656,7 +1700,7 @@
                                     <TextBlock Text="Optional Rules" FontSize="{Binding XLargeFontSize}" FontWeight="Bold" 
                                                Foreground="#cdd6f4" Margin="0,0,0,15"/>
                                     
-                                    <TextBlock Text="Doubling Rules" FontSize="{Binding LargeFontSize}" FontWeight="SemiBold" Foreground="#89b4fa" Margin="0,0,0,8"/>
+                                    <TextBlock Text="Doubling Rules" FontSize="{Binding LargeFontSize}" FontWeight="SemiBold" Foreground="#cdd6f4" Margin="0,0,0,8"/>
                                     <StackPanel>
                                         <CheckBox Content="Dealer allowed to double" Foreground="#cdd6f4" FontSize="{Binding BaseFontSize}"
                                                   IsChecked="{Binding DealerAllowedToDouble, Mode=TwoWay}"/>
@@ -1753,7 +1797,7 @@
                     BorderBrush="#45475a" BorderThickness="1">
                 <StackPanel>
                     <TextBlock Text="Load Game" FontSize="{Binding XXLargeFontSize}" FontWeight="Bold" 
-                               Foreground="#89b4fa" HorizontalAlignment="Center" Margin="0,0,0,15"/>
+                               Foreground="#cdd6f4" HorizontalAlignment="Center" Margin="0,0,0,15"/>
                     <TextBlock Text="Select a saved game to continue:" 
                                Foreground="#a6adc8" HorizontalAlignment="Center" Margin="0,0,0,15"/>
                     
