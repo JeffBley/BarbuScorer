@@ -64,14 +64,7 @@ public class DoubleTargetInfo : INotifyPropertyChanged
 public class BiddingState : INotifyPropertyChanged
 {
     private Player? _currentBidder;
-    private BiddingPhase _phase = BiddingPhase.NotStarted;
     private string _biddingMessage = "";
-
-    public BiddingPhase Phase
-    {
-        get => _phase;
-        set { _phase = value; OnPropertyChanged(); }
-    }
 
     public Player? CurrentBidder
     {
@@ -145,7 +138,6 @@ public class BiddingState : INotifyPropertyChanged
 
     public void Reset()
     {
-        Phase = BiddingPhase.NotStarted;
         CurrentBidder = null;
         BiddingMessage = "";
         Doubles.Clear();
@@ -157,10 +149,11 @@ public class BiddingState : INotifyPropertyChanged
         History.Clear();
     }
 
-    // Check if playerA has already doubled playerB
+    // Check if playerA has already doubled playerB. Compare by Index so this works
+    // correctly after deserialization (where Player references are new instances).
     public DoubleBid? GetExistingDouble(Player doubler, Player target)
     {
-        return Doubles.FirstOrDefault(d => d.Doubler == doubler && d.Target == target);
+        return Doubles.FirstOrDefault(d => d.Doubler.Index == doubler.Index && d.Target.Index == target.Index);
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
@@ -169,14 +162,6 @@ public class BiddingState : INotifyPropertyChanged
     {
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
     }
-}
-
-public enum BiddingPhase
-{
-    NotStarted,
-    Doubling,      // Players are choosing who to double
-    Redoubling,    // Doubled players are responding
-    Complete       // Bidding is finished
 }
 
 public class BiddingHistoryEntry

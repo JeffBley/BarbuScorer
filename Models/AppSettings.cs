@@ -8,7 +8,7 @@ namespace CardGameScorer.Models;
 /// </summary>
 public class AppSettings
 {
-    public TextSize TextSize { get; set; } = TextSize.Small;
+    public TextSize TextSize { get; set; } = TextSize.Medium;
     public bool DealerAllowedToDouble { get; set; } = false;
     public GameMode GameMode { get; set; } = GameMode.Standard;
     public BarbuVersion BarbuVersion { get; set; } = BarbuVersion.Classic;
@@ -18,6 +18,12 @@ public class AppSettings
     public int FanTanScore2nd { get; set; } = 25;
     public int FanTanScore3rd { get; set; } = 10;
     public int FanTanScore4th { get; set; } = -10;
+    // Fan Tan / Domino scores used when only Ravage City is enabled (no Chinese Poker).
+    // Default total is 85 to keep the game zero-sum with the extra Ravage City contract.
+    public int FanTanRcScore1st { get; set; } = 50;
+    public int FanTanRcScore2nd { get; set; } = 25;
+    public int FanTanRcScore3rd { get; set; } = 10;
+    public int FanTanRcScore4th { get; set; } = 0;
     
     private static readonly string SettingsFilePath = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),

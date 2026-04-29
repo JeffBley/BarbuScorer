@@ -14,6 +14,7 @@ public class DoublingMatrixCell : INotifyPropertyChanged
     private bool _isDouble;
     private bool _isRedouble;
     private bool _isDoubleEnabled = true;
+    private DoublingMatrixCell? _inverseCell;
 
     public Player Doubler { get; set; } = null!;
     public Player Target { get; set; } = null!;
@@ -26,20 +27,79 @@ public class DoublingMatrixCell : INotifyPropertyChanged
     /// <summary>This double is required by the rule that each player must double each dealer twice.</summary>
     public bool IsMandatory { get; set; }
 
+    /// <summary>True when this cell belongs to the dealer's row and dealers aren't allowed
+    /// to double. The Dbl checkbox is hidden, leaving only Re-Dbl available.</summary>
+    private bool _isDealerRowLocked;
+    public bool IsDealerRowLocked
+    {
+        get => _isDealerRowLocked;
+        set
+        {
+            if (_isDealerRowLocked == value) return;
+            _isDealerRowLocked = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(IsNotDealerRowLocked));
+            OnPropertyChanged(nameof(IsDoubleEnabled));
+        }
+    }
+    public bool IsNotDealerRowLocked => !_isDealerRowLocked;
+
+    /// <summary>The mirror cell where the row/column players are swapped. When this cell's
+    /// inverse is doubled, this cell's Dbl is disabled and Re-Dbl becomes the only option,
+    /// representing this player redoubling the other player's original double.</summary>
+    public DoublingMatrixCell? InverseCell
+    {
+        get => _inverseCell;
+        set
+        {
+            if (_inverseCell != null)
+                _inverseCell.PropertyChanged -= OnInversePropertyChanged;
+            _inverseCell = value;
+            if (_inverseCell != null)
+                _inverseCell.PropertyChanged += OnInversePropertyChanged;
+            OnPropertyChanged(nameof(IsDoubleEnabled));
+            OnPropertyChanged(nameof(IsRedoubleEnabled));
+            OnPropertyChanged(nameof(EffectiveRedouble));
+        }
+    }
+
+    private void OnInversePropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(IsDouble))
+        {
+            OnPropertyChanged(nameof(IsDoubleEnabled));
+            OnPropertyChanged(nameof(IsRedoubleEnabled));
+            OnPropertyChanged(nameof(EffectiveRedouble));
+        }
+        else if (e.PropertyName == nameof(IsRedouble))
+        {
+            OnPropertyChanged(nameof(EffectiveRedouble));
+        }
+    }
+
     public bool IsDouble
     {
         get => _isDouble;
         set
         {
             if (_isDouble == value) return;
+            // Mandatory doubles cannot be unchecked.
+            if (IsMandatory && !value)
+            {
+                // Notify so the bound UI reverts to checked.
+                OnPropertyChanged();
+                return;
+            }
             _isDouble = value;
             OnPropertyChanged();
             OnPropertyChanged(nameof(IsRedoubleEnabled));
+            OnPropertyChanged(nameof(EffectiveRedouble));
             // If the double is unchecked, the redouble must also be cleared.
             if (!_isDouble && _isRedouble)
             {
                 _isRedouble = false;
                 OnPropertyChanged(nameof(IsRedouble));
+                OnPropertyChanged(nameof(EffectiveRedouble));
             }
         }
     }
@@ -54,18 +114,41 @@ public class DoublingMatrixCell : INotifyPropertyChanged
             if (value && !_isDouble) return;
             _isRedouble = value;
             OnPropertyChanged();
+            OnPropertyChanged(nameof(EffectiveRedouble));
         }
     }
 
-    /// <summary>Whether the double checkbox can be toggled (false for dealer's row when dealer can't double).</summary>
+    /// <summary>Whether the double checkbox can be toggled. Disabled when the inverse cell
+    /// is already doubled (in which case only a redouble is possible from this side) or when
+    /// the row is the dealer's and dealers aren't allowed to double.</summary>
     public bool IsDoubleEnabled
     {
-        get => _isDoubleEnabled;
+        get => _isDoubleEnabled && !IsDealerRowLocked && !(InverseCell?.IsDouble ?? false);
         set { _isDoubleEnabled = value; OnPropertyChanged(); }
     }
 
-    /// <summary>Redouble checkbox is enabled only after the double box is checked.</summary>
-    public bool IsRedoubleEnabled => IsDouble;
+    /// <summary>Redouble checkbox is enabled only when the inverse cell is doubled
+    /// (i.e., the other player has doubled this player) — never alongside this cell's own Dbl.</summary>
+    public bool IsRedoubleEnabled => !IsDouble && (InverseCell?.IsDouble ?? false);
+
+    /// <summary>The Re-Dbl checkbox in the UI binds here. The redouble is always stored
+    /// on the inverse cell so that scoring (which looks at the original DoubleBid) sees
+    /// IsRedoubled=true on the doubler's entry.</summary>
+    public bool EffectiveRedouble
+    {
+        get
+        {
+            if (InverseCell != null && InverseCell.IsDouble) return InverseCell.IsRedouble;
+            return false;
+        }
+        set
+        {
+            if (InverseCell != null && InverseCell.IsDouble)
+            {
+                InverseCell.IsRedouble = value;
+            }
+        }
+    }
 
     public event PropertyChangedEventHandler? PropertyChanged;
     protected void OnPropertyChanged([CallerMemberName] string? name = null) =>
@@ -80,6 +163,29 @@ public class DoublingMatrixRow : INotifyPropertyChanged
     public Player Doubler { get; set; } = null!;
     public string DoublerLabel => $"{Doubler?.Name} doubles";
     public List<DoublingMatrixCell> Cells { get; set; } = new();
+
+    private bool _isDealer;
+    public bool IsDealer
+    {
+        get => _isDealer;
+        set { _isDealer = value; OnPropertyChanged(); }
+    }
+
+    /// <summary>True when this row represents the current dealer AND dealers are not allowed to double.</summary>
+    private bool _isDealerLocked;
+    public bool IsDealerLocked
+    {
+        get => _isDealerLocked;
+        set
+        {
+            _isDealerLocked = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(IsNotDealerLocked));
+            foreach (var cell in Cells)
+                cell.IsDealerRowLocked = value;
+        }
+    }
+    public bool IsNotDealerLocked => !_isDealerLocked;
 
     public ICommand? MaxCommand { get; set; }
 

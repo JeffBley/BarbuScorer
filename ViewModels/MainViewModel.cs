@@ -24,14 +24,25 @@ public enum GamePhase
 public class SavedGameInfo : INotifyPropertyChanged
 {
     private bool _isShowingDeleteOption;
-    
-    public string FilePath { get; set; } = "";
-    public string GameName { get; set; } = "";
+    private string _filePath = "";
+    private string _gameName = "";
+
+    public string FilePath
+    {
+        get => _filePath;
+        set { _filePath = value; OnPropertyChanged(); OnPropertyChanged(nameof(DisplayName)); }
+    }
+    public string GameName
+    {
+        get => _gameName;
+        set { _gameName = value; OnPropertyChanged(); OnPropertyChanged(nameof(DisplayName)); }
+    }
     public int CurrentHandNumber { get; set; }
     public DateTime SavedAt { get; set; }
+    public int TotalRounds { get; set; } = 28;
     
     public string DisplayName => string.IsNullOrEmpty(GameName) ? System.IO.Path.GetFileNameWithoutExtension(FilePath) : GameName;
-    public string RoundInfo => $"Round {CurrentHandNumber} of 28";
+    public string RoundInfo => $"Round {Math.Min(CurrentHandNumber, TotalRounds)} of {TotalRounds}";
     public string SavedAtDisplay => SavedAt.ToString("MMM d, yyyy h:mm tt");
     
     public bool IsShowingDeleteOption
@@ -45,8 +56,11 @@ public class SavedGameInfo : INotifyPropertyChanged
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
 }
 
-public class MainViewModel : INotifyPropertyChanged
+public class MainViewModel : INotifyPropertyChanged, IDisposable
 {
+    /// <summary>Number of contracts each dealer must deal in a full game.</summary>
+    public const int ContractsPerDealer = 7;
+
     private GameScreen _currentScreen = GameScreen.PlayerSetup;
     private GamePhase _currentPhase = GamePhase.SelectingContract;
     private Player? _currentDealer;
@@ -108,6 +122,16 @@ public class MainViewModel : INotifyPropertyChanged
         set { _isSettingsOpen = value; OnPropertyChanged(); }
     }
 
+    // Snapshot of settings taken when the settings panel is opened, used to detect/discard changes.
+    private AppSettings? _settingsSnapshot;
+
+    private bool _showDiscardSettingsPrompt;
+    public bool ShowDiscardSettingsPrompt
+    {
+        get => _showDiscardSettingsPrompt;
+        set { _showDiscardSettingsPrompt = value; OnPropertyChanged(); }
+    }
+
     private int _selectedSettingsTab;
     public int SelectedSettingsTab
     {
@@ -115,7 +139,14 @@ public class MainViewModel : INotifyPropertyChanged
         set { _selectedSettingsTab = value; OnPropertyChanged(); }
     }
 
-    private TextSize _selectedTextSize = TextSize.Small;
+    private int _selectedMainTab;
+    public int SelectedMainTab
+    {
+        get => _selectedMainTab;
+        set { _selectedMainTab = value; OnPropertyChanged(); }
+    }
+
+    private TextSize _selectedTextSize = TextSize.Medium;
     public TextSize SelectedTextSize
     {
         get => _selectedTextSize;
@@ -132,6 +163,8 @@ public class MainViewModel : INotifyPropertyChanged
             OnPropertyChanged(nameof(XXLargeFontSize));
             OnPropertyChanged(nameof(HugeFontSize));
             OnPropertyChanged(nameof(TitleFontSize));
+            OnPropertyChanged(nameof(GameFlowPanelWidth));
+            OnPropertyChanged(nameof(GameFlowMaxWidth));
             OnPropertyChanged(nameof(CircleSize));
             OnPropertyChanged(nameof(CircleCornerRadius));
             OnPropertyChanged(nameof(CircleFontSize));
@@ -151,6 +184,15 @@ public class MainViewModel : INotifyPropertyChanged
             if (_dealerAllowedToDouble == value) return;
             _dealerAllowedToDouble = value; 
             OnPropertyChanged();
+            // Update existing matrix rows so the dealer-locked UI state reflects the new setting.
+            if (CurrentDealer != null)
+            {
+                foreach (var row in DoublingMatrix)
+                {
+                    row.IsDealerLocked = (row.Doubler?.Index == CurrentDealer.Index) && !_dealerAllowedToDouble;
+                    row.IsDealer = row.Doubler?.Index == CurrentDealer.Index;
+                }
+            }
             SaveSettings();
         }
     }
@@ -168,12 +210,21 @@ public class MainViewModel : INotifyPropertyChanged
             OnPropertyChanged(nameof(IsStandardMode));
             OnPropertyChanged(nameof(IsSaladeMode));
             OnPropertyChanged(nameof(NotSaladeMode));
+            Contract.SaladeModeEnabled = value == GameMode.Salade;
             // Disable optional games when Salade is selected
             if (value == GameMode.Salade)
             {
                 RavageCityEnabled = false;
                 ChinesePokerEnabled = false;
             }
+            // Refresh contract list (adds/removes Salade vs Trumps/FanTan)
+            RefreshContractOptions();
+            // Refresh scorecard names (e.g. "No Last Two" \u2194 "No Last Trick")
+            RefreshScorecardNames();
+            OnPropertyChanged(nameof(TotalRounds));
+            OnPropertyChanged(nameof(ContractsPerDealerForMode));
+            OnPropertyChanged(nameof(ScorecardScale));
+            OnPropertyChanged(nameof(GameTypeDisplay));
             SaveSettings();
             // Prompt to start new game if a game is in progress
             if (IsGameScreen)
@@ -198,6 +249,18 @@ public class MainViewModel : INotifyPropertyChanged
 
     public bool NotSaladeMode => GameMode != GameMode.Salade;
 
+    /// <summary>Snapshot the scoring-relevant flags/values for use with <see cref="HandResult.RecomputeBaseScores"/>.</summary>
+    public ScoringContext CurrentScoringContext => new()
+    {
+        IsSaladeMode = IsSaladeMode,
+        RavageCityEnabled = RavageCityEnabled,
+        ChinesePokerEnabled = ChinesePokerEnabled,
+        FanTanScore1st = FanTanScore1st,
+        FanTanScore2nd = FanTanScore2nd,
+        FanTanScore3rd = FanTanScore3rd,
+        FanTanScore4th = FanTanScore4th,
+    };
+
     private BarbuVersion _barbuVersion = BarbuVersion.Classic;
     public BarbuVersion BarbuVersion
     {
@@ -209,6 +272,8 @@ public class MainViewModel : INotifyPropertyChanged
             OnPropertyChanged();
             OnPropertyChanged(nameof(IsClassicNames));
             OnPropertyChanged(nameof(IsModernNames));
+            OnPropertyChanged(nameof(FanTanScoringHeader));
+            OnPropertyChanged(nameof(FanTanContractName));
             Contract.CurrentVersion = value;
             // Refresh contract display names
             foreach (var option in AllContractOptions)
@@ -232,6 +297,18 @@ public class MainViewModel : INotifyPropertyChanged
         set { if (value) BarbuVersion = BarbuVersion.Modern; }
     }
 
+    public string FanTanScoringHeader
+    {
+        get
+        {
+            var baseName = IsModernNames ? "Domino Scoring" : "Fan Tan Scoring";
+            if (IsRavageCityOnly) return $"{baseName} (with Ravage City)";
+            return baseName;
+        }
+    }
+
+    public string FanTanContractName => IsModernNames ? "Domino" : "Fan Tan";
+
     private bool _ravageCityEnabled;
     public bool RavageCityEnabled
     {
@@ -243,11 +320,18 @@ public class MainViewModel : INotifyPropertyChanged
             _ravageCityEnabled = value; 
             Contract.RavageCityModeEnabled = value;
             OnPropertyChanged();
+            OnPropertyChanged(nameof(TotalRounds));
+            OnPropertyChanged(nameof(ContractsPerDealerForMode));
+            OnPropertyChanged(nameof(ScorecardScale));
+            OnPropertyChanged(nameof(GameTypeDisplay));
             // If Ravage City is disabled, Chinese Poker must also be disabled
             if (!value && ChinesePokerEnabled)
             {
                 ChinesePokerEnabled = false;
             }
+            // Active Fan Tan set may change when Ravage City flips.
+            SyncActiveFanTanToContract();
+            NotifyFanTanDerived();
             // Refresh contract options to update descriptions and availability
             RefreshContractOptions();
             SaveSettings();
@@ -271,11 +355,18 @@ public class MainViewModel : INotifyPropertyChanged
             _chinesePokerEnabled = value;
             Contract.ChinesePokerModeEnabled = value;
             OnPropertyChanged();
+            OnPropertyChanged(nameof(TotalRounds));
+            OnPropertyChanged(nameof(ContractsPerDealerForMode));
+            OnPropertyChanged(nameof(ScorecardScale));
+            OnPropertyChanged(nameof(GameTypeDisplay));
             // If Chinese Poker is enabled, Ravage City must also be enabled
             if (value && !RavageCityEnabled)
             {
                 RavageCityEnabled = true;
             }
+            // Active Fan Tan set may change (RC-only flips).
+            SyncActiveFanTanToContract();
+            NotifyFanTanDerived();
             // Refresh contract options to update descriptions and availability
             RefreshContractOptions();
             SaveSettings();
@@ -308,37 +399,100 @@ public class MainViewModel : INotifyPropertyChanged
     public int[] ChinesePokerTotalInputs { get; } = new int[4];
 
     // Fan Tan/Domino Scoring
+    // Two stored sets:
+    //   - Standard: also used in Standard + Ravage City + Chinese Poker (target total 65)
+    //   - Ravage City only: used when RavageCity is on but Chinese Poker is off (target total 85)
     private int _fanTanScore1st = 40;
     public int FanTanScore1st
     {
         get => _fanTanScore1st;
-        set { _fanTanScore1st = value; Contract.FanTanScore1st = value; OnPropertyChanged(); OnPropertyChanged(nameof(FanTanScoringDisplay)); OnPropertyChanged(nameof(FanTanScoringTotal)); OnPropertyChanged(nameof(IsFanTanScoringValid)); }
+        set { _fanTanScore1st = value; SyncActiveFanTanToContract(); OnPropertyChanged(); NotifyFanTanDerived(); }
     }
 
     private int _fanTanScore2nd = 25;
     public int FanTanScore2nd
     {
         get => _fanTanScore2nd;
-        set { _fanTanScore2nd = value; Contract.FanTanScore2nd = value; OnPropertyChanged(); OnPropertyChanged(nameof(FanTanScoringDisplay)); OnPropertyChanged(nameof(FanTanScoringTotal)); OnPropertyChanged(nameof(IsFanTanScoringValid)); }
+        set { _fanTanScore2nd = value; SyncActiveFanTanToContract(); OnPropertyChanged(); NotifyFanTanDerived(); }
     }
 
     private int _fanTanScore3rd = 10;
     public int FanTanScore3rd
     {
         get => _fanTanScore3rd;
-        set { _fanTanScore3rd = value; Contract.FanTanScore3rd = value; OnPropertyChanged(); OnPropertyChanged(nameof(FanTanScoringDisplay)); OnPropertyChanged(nameof(FanTanScoringTotal)); OnPropertyChanged(nameof(IsFanTanScoringValid)); }
+        set { _fanTanScore3rd = value; SyncActiveFanTanToContract(); OnPropertyChanged(); NotifyFanTanDerived(); }
     }
 
     private int _fanTanScore4th = -10;
     public int FanTanScore4th
     {
         get => _fanTanScore4th;
-        set { _fanTanScore4th = value; Contract.FanTanScore4th = value; OnPropertyChanged(); OnPropertyChanged(nameof(FanTanScoringDisplay)); OnPropertyChanged(nameof(FanTanScoringTotal)); OnPropertyChanged(nameof(IsFanTanScoringValid)); }
+        set { _fanTanScore4th = value; SyncActiveFanTanToContract(); OnPropertyChanged(); NotifyFanTanDerived(); }
     }
 
-    public string FanTanScoringDisplay => $"{FanTanScore1st}/{FanTanScore2nd}/{FanTanScore3rd}/{FanTanScore4th}";
-    public int FanTanScoringTotal => FanTanScore1st + FanTanScore2nd + FanTanScore3rd + FanTanScore4th;
-    public bool IsFanTanScoringValid => FanTanScoringTotal == 65;
+    private int _fanTanRcScore1st = 50;
+    public int FanTanRcScore1st
+    {
+        get => _fanTanRcScore1st;
+        set { _fanTanRcScore1st = value; SyncActiveFanTanToContract(); OnPropertyChanged(); NotifyFanTanDerived(); }
+    }
+
+    private int _fanTanRcScore2nd = 25;
+    public int FanTanRcScore2nd
+    {
+        get => _fanTanRcScore2nd;
+        set { _fanTanRcScore2nd = value; SyncActiveFanTanToContract(); OnPropertyChanged(); NotifyFanTanDerived(); }
+    }
+
+    private int _fanTanRcScore3rd = 10;
+    public int FanTanRcScore3rd
+    {
+        get => _fanTanRcScore3rd;
+        set { _fanTanRcScore3rd = value; SyncActiveFanTanToContract(); OnPropertyChanged(); NotifyFanTanDerived(); }
+    }
+
+    private int _fanTanRcScore4th = 0;
+    public int FanTanRcScore4th
+    {
+        get => _fanTanRcScore4th;
+        set { _fanTanRcScore4th = value; SyncActiveFanTanToContract(); OnPropertyChanged(); NotifyFanTanDerived(); }
+    }
+
+    /// <summary>True when Ravage City is enabled but Chinese Poker is not — uses the alternate (85-total) set.</summary>
+    public bool IsRavageCityOnly => RavageCityEnabled && !ChinesePokerEnabled;
+
+    public int ActiveFanTanScore1st => IsRavageCityOnly ? _fanTanRcScore1st : _fanTanScore1st;
+    public int ActiveFanTanScore2nd => IsRavageCityOnly ? _fanTanRcScore2nd : _fanTanScore2nd;
+    public int ActiveFanTanScore3rd => IsRavageCityOnly ? _fanTanRcScore3rd : _fanTanScore3rd;
+    public int ActiveFanTanScore4th => IsRavageCityOnly ? _fanTanRcScore4th : _fanTanScore4th;
+
+    public int FanTanScoringRequiredTotal => IsRavageCityOnly ? 85 : 65;
+
+    public string FanTanScoringDisplay => $"{ActiveFanTanScore1st}/{ActiveFanTanScore2nd}/{ActiveFanTanScore3rd}/{ActiveFanTanScore4th}";
+    public int FanTanScoringTotal => ActiveFanTanScore1st + ActiveFanTanScore2nd + ActiveFanTanScore3rd + ActiveFanTanScore4th;
+    public bool IsFanTanScoringValid => FanTanScoringTotal == FanTanScoringRequiredTotal;
+
+    private void SyncActiveFanTanToContract()
+    {
+        Contract.FanTanScore1st = ActiveFanTanScore1st;
+        Contract.FanTanScore2nd = ActiveFanTanScore2nd;
+        Contract.FanTanScore3rd = ActiveFanTanScore3rd;
+        Contract.FanTanScore4th = ActiveFanTanScore4th;
+    }
+
+    private void NotifyFanTanDerived()
+    {
+        OnPropertyChanged(nameof(ActiveFanTanScore1st));
+        OnPropertyChanged(nameof(ActiveFanTanScore2nd));
+        OnPropertyChanged(nameof(ActiveFanTanScore3rd));
+        OnPropertyChanged(nameof(ActiveFanTanScore4th));
+        OnPropertyChanged(nameof(FanTanScoringDisplay));
+        OnPropertyChanged(nameof(FanTanScoringTotal));
+        OnPropertyChanged(nameof(FanTanScoringRequiredTotal));
+        OnPropertyChanged(nameof(IsFanTanScoringValid));
+        OnPropertyChanged(nameof(FanTanScoringHeader));
+        OnPropertyChanged(nameof(FanTanScoringRequiredTotalDisplay));
+    }
 
     // Temp values for editing
     private int _tempFanTanScore1st;
@@ -371,7 +525,9 @@ public class MainViewModel : INotifyPropertyChanged
     }
 
     public int TempFanTanScoringTotal => TempFanTanScore1st + TempFanTanScore2nd + TempFanTanScore3rd + TempFanTanScore4th;
-    public bool IsTempFanTanScoringValid => TempFanTanScoringTotal == 65;
+    public bool IsTempFanTanScoringValid => TempFanTanScoringTotal == FanTanScoringRequiredTotal;
+
+    public string FanTanScoringRequiredTotalDisplay => $"Scores must total {FanTanScoringRequiredTotal} points";
 
     private bool _showFanTanScoringEditor;
     public bool ShowFanTanScoringEditor
@@ -386,10 +542,10 @@ public class MainViewModel : INotifyPropertyChanged
 
     private void OpenFanTanScoringEditor()
     {
-        TempFanTanScore1st = FanTanScore1st;
-        TempFanTanScore2nd = FanTanScore2nd;
-        TempFanTanScore3rd = FanTanScore3rd;
-        TempFanTanScore4th = FanTanScore4th;
+        TempFanTanScore1st = ActiveFanTanScore1st;
+        TempFanTanScore2nd = ActiveFanTanScore2nd;
+        TempFanTanScore3rd = ActiveFanTanScore3rd;
+        TempFanTanScore4th = ActiveFanTanScore4th;
         ShowFanTanScoringEditor = true;
     }
 
@@ -397,10 +553,20 @@ public class MainViewModel : INotifyPropertyChanged
     {
         if (IsTempFanTanScoringValid)
         {
-            FanTanScore1st = TempFanTanScore1st;
-            FanTanScore2nd = TempFanTanScore2nd;
-            FanTanScore3rd = TempFanTanScore3rd;
-            FanTanScore4th = TempFanTanScore4th;
+            if (IsRavageCityOnly)
+            {
+                FanTanRcScore1st = TempFanTanScore1st;
+                FanTanRcScore2nd = TempFanTanScore2nd;
+                FanTanRcScore3rd = TempFanTanScore3rd;
+                FanTanRcScore4th = TempFanTanScore4th;
+            }
+            else
+            {
+                FanTanScore1st = TempFanTanScore1st;
+                FanTanScore2nd = TempFanTanScore2nd;
+                FanTanScore3rd = TempFanTanScore3rd;
+                FanTanScore4th = TempFanTanScore4th;
+            }
             ShowFanTanScoringEditor = false;
             SaveSettings();
             // Refresh contract options to update descriptions with new Fan Tan values
@@ -413,13 +579,20 @@ public class MainViewModel : INotifyPropertyChanged
         ShowFanTanScoringEditor = false;
     }
 
-    public double BaseFontSize => SelectedTextSize switch
+    public double BaseFontSize
     {
-        TextSize.Small => 14,
-        TextSize.Medium => 16,
-        TextSize.Large => 18,
-        _ => 14
-    };
+        get
+        {
+            double settingBase = SelectedTextSize switch
+            {
+                TextSize.Small => 14,
+                TextSize.Medium => 18,
+                TextSize.Large => 24,
+                _ => 14
+            };
+            return settingBase * WindowScaleFactor;
+        }
+    }
 
     // Scaled font sizes
     public double SmallFontSize => BaseFontSize * 0.78;     // ~11
@@ -429,6 +602,45 @@ public class MainViewModel : INotifyPropertyChanged
     public double XXLargeFontSize => BaseFontSize * 1.43;   // ~20
     public double HugeFontSize => BaseFontSize * 2.0;       // ~28
     public double TitleFontSize => BaseFontSize * 2.57;     // ~36
+
+    // Window-aware sizing: code-behind feeds WindowWidth from Window.SizeChanged.
+    private double _windowWidth = 1000;
+    public double WindowWidth
+    {
+        get => _windowWidth;
+        set
+        {
+            if (Math.Abs(_windowWidth - value) < 0.5) return;
+            _windowWidth = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(WindowScaleFactor));
+            OnPropertyChanged(nameof(GameFlowPanelWidth));
+            OnPropertyChanged(nameof(GameFlowMaxWidth));
+            OnPropertyChanged(nameof(BaseFontSize));
+            OnPropertyChanged(nameof(SmallFontSize));
+            OnPropertyChanged(nameof(MediumFontSize));
+            OnPropertyChanged(nameof(LargeFontSize));
+            OnPropertyChanged(nameof(XLargeFontSize));
+            OnPropertyChanged(nameof(XXLargeFontSize));
+            OnPropertyChanged(nameof(HugeFontSize));
+            OnPropertyChanged(nameof(TitleFontSize));
+            OnPropertyChanged(nameof(CircleSize));
+            OnPropertyChanged(nameof(CircleCornerRadius));
+            OnPropertyChanged(nameof(CircleFontSize));
+            OnPropertyChanged(nameof(DiamondOuterSize));
+            OnPropertyChanged(nameof(DiamondInnerSize));
+            OnPropertyChanged(nameof(DiamondFontSize));
+        }
+    }
+
+    // Scale factor relative to a 1200px-wide reference window. Clamped so things stay readable.
+    public double WindowScaleFactor => Math.Max(0.65, Math.Min(2.0, WindowWidth / 1200.0));
+
+    // The Game Flow panel stays a comfortable reading width (~50× the base font),
+    // capped to the window so it never overflows. Centered, not stretched.
+    public double GameFlowMaxWidth => Math.Max(400, Math.Min(BaseFontSize * 50, WindowWidth - 80));
+    // Panel width scales with text size so larger fonts fill more of the screen
+    public double GameFlowPanelWidth => BaseFontSize * 50;  // 900 / 1200 / 1600
 
     // Icon sizes for doubling indicators (circles and diamonds)
     public double CircleSize => BaseFontSize;               // 14/16/18 based on setting
@@ -446,11 +658,35 @@ public class MainViewModel : INotifyPropertyChanged
         set { _isEditingScore = value; OnPropertyChanged(); }
     }
 
+    private bool _isEditChooserOpen;
+    public bool IsEditChooserOpen
+    {
+        get => _isEditChooserOpen;
+        set { _isEditChooserOpen = value; OnPropertyChanged(); }
+    }
+
     private ScorecardRow? _rowBeingEdited;
     public ScorecardRow? RowBeingEdited
     {
         get => _rowBeingEdited;
-        set { _rowBeingEdited = value; OnPropertyChanged(); OnPropertyChanged(nameof(EditingGameDescription)); }
+        set
+        {
+            _rowBeingEdited = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(EditingGameDescription));
+            OnPropertyChanged(nameof(EditContractInstructions));
+            // Per-contract edit-visibility flags
+            OnPropertyChanged(nameof(EditShowNumericFour));
+            OnPropertyChanged(nameof(EditShowAcePicker));
+            OnPropertyChanged(nameof(EditShowKingPicker));
+            OnPropertyChanged(nameof(EditShowLastPicker));
+            OnPropertyChanged(nameof(EditShowSecondToLastPicker));
+            OnPropertyChanged(nameof(EditShowSaladeGrid));
+            OnPropertyChanged(nameof(EditShowRavageCity));
+            OnPropertyChanged(nameof(EditShowChinesePoker));
+            OnPropertyChanged(nameof(EditShowFanTanHelp));
+            OnPropertyChanged(nameof(EditNumericLabel));
+        }
     }
 
     public string EditingGameDescription => RowBeingEdited != null 
@@ -468,10 +704,134 @@ public class MainViewModel : INotifyPropertyChanged
 
     public bool HasEditError => !string.IsNullOrEmpty(EditErrorMessage);
 
+    // === Edit-Inputs state (Phase 3) ===
+    private bool _isEditingInputs;
+    public bool IsEditingInputs
+    {
+        get => _isEditingInputs;
+        set { _isEditingInputs = value; OnPropertyChanged(); }
+    }
+
+    private string? _editInputsError;
+    public string? EditInputsError
+    {
+        get => _editInputsError;
+        set { _editInputsError = value; OnPropertyChanged(); OnPropertyChanged(nameof(HasEditInputsError)); }
+    }
+    public bool HasEditInputsError => !string.IsNullOrEmpty(_editInputsError);
+
+    // === Edit-Bid state (Phase 4) ===
+    private bool _isEditingBid;
+    public bool IsEditingBid
+    {
+        get => _isEditingBid;
+        set { _isEditingBid = value; OnPropertyChanged(); }
+    }
+    private string? _editBidError;
+    public string? EditBidError
+    {
+        get => _editBidError;
+        set { _editBidError = value; OnPropertyChanged(); OnPropertyChanged(nameof(HasEditBidError)); }
+    }
+    public bool HasEditBidError => !string.IsNullOrEmpty(_editBidError);
+    public ObservableCollection<DoublingMatrixRow> EditDoublingMatrix { get; } = new();
+    public ObservableCollection<DoublingMatrixHeader> EditDoublingMatrixHeaders { get; } = new();
+
+    public int[] EditSaladeTricks { get; } = new int[4];
+    public int[] EditSaladeQueens { get; } = new int[4];
+    public int[] EditSaladeHearts { get; } = new int[4];
+
+    private Player? _editAceOfHeartsPlayer;
+    public Player? EditAceOfHeartsPlayer { get => _editAceOfHeartsPlayer; set { _editAceOfHeartsPlayer = value; OnPropertyChanged(); } }
+
+    private Player? _editKingOfHeartsPlayer;
+    public Player? EditKingOfHeartsPlayer { get => _editKingOfHeartsPlayer; set { _editKingOfHeartsPlayer = value; OnPropertyChanged(); } }
+
+    private Player? _editLastTrickPlayer;
+    public Player? EditLastTrickPlayer { get => _editLastTrickPlayer; set { _editLastTrickPlayer = value; OnPropertyChanged(); } }
+
+    private Player? _editSecondToLastTrickPlayer;
+    public Player? EditSecondToLastTrickPlayer { get => _editSecondToLastTrickPlayer; set { _editSecondToLastTrickPlayer = value; OnPropertyChanged(); } }
+
+    public ObservableCollection<RavageCityPlayerSelection> EditRavageCitySelections { get; } = new();
+
+    private bool _editChinesePokerScoreBySetting = true;
+    public bool EditChinesePokerScoreBySetting
+    {
+        get => _editChinesePokerScoreBySetting;
+        set { _editChinesePokerScoreBySetting = value; OnPropertyChanged(); OnPropertyChanged(nameof(EditChinesePokerScoreByTotal)); }
+    }
+    public bool EditChinesePokerScoreByTotal
+    {
+        get => !_editChinesePokerScoreBySetting;
+        set { EditChinesePokerScoreBySetting = !value; }
+    }
+    public int[,] EditChinesePokerSetting { get; } = new int[4, 3];
+    public int[] EditChinesePokerTotal { get; } = new int[4];
+
+    public ContractType? EditContract => RowBeingEdited?.Contract;
+
+    public bool EditShowNumericFour =>
+        EditContract is ContractType.Nullo or ContractType.NoQueens or ContractType.Hearts
+                       or ContractType.Trumps or ContractType.FanTan;
+    public bool EditShowAcePicker => EditContract == ContractType.Hearts && !IsSaladeMode;
+    public bool EditShowKingPicker => EditContract is ContractType.Barbu or ContractType.Salade;
+    public bool EditShowLastPicker => EditContract is ContractType.NoLastTwo or ContractType.Salade;
+    public bool EditShowSecondToLastPicker => EditContract == ContractType.NoLastTwo && !IsSaladeMode;
+    public bool EditShowSaladeGrid => EditContract == ContractType.Salade;
+    public bool EditShowRavageCity => EditContract == ContractType.RavageCity;
+    public bool EditShowChinesePoker => EditContract == ContractType.ChinesePoker;
+    public bool EditShowFanTanHelp => EditContract == ContractType.FanTan;
+
+    public string EditNumericLabel => EditContract switch
+    {
+        ContractType.Nullo => "Tricks per player (sum = 13)",
+        ContractType.NoQueens => "Queens per player (sum = 4)",
+        ContractType.Hearts => IsSaladeMode ? "Hearts per player (sum = 13)" : "Hearts per player, not counting Ace (sum = 12)",
+        ContractType.Trumps => "Tricks per player (sum = 13)",
+        ContractType.FanTan => "Finish position (1-4) per player",
+        _ => ""
+    };
+
+    public string EditContractInstructions => RowBeingEdited == null
+        ? ""
+        : $"Editing inputs for {RowBeingEdited.GameName} ({RowBeingEdited.Dealer.Name}'s deal). Saving will recompute scores from these inputs and the current doubles.";
+
     // Score Summary properties
     public int[] SummaryBaseScores { get; } = new int[4];
     public int[] SummaryFinalScores { get; } = new int[4];
     public List<string> ScoringExplanation { get; } = new();
+
+    // Podium (game-over winner display): always 4 entries ordered 1st, 2nd, 3rd, 4th.
+    public List<PodiumEntry> PodiumEntries
+    {
+        get
+        {
+            var ranked = Players
+                .Select(p => new { p.Name, p.TotalScore })
+                .OrderByDescending(x => x.TotalScore)
+                .ToList();
+            var entries = new List<PodiumEntry>();
+            for (int i = 0; i < ranked.Count; i++)
+            {
+                int place = i + 1;
+                string medal = place switch { 1 => "\U0001F947", 2 => "\U0001F948", 3 => "\U0001F949", _ => "\U0001F397" };
+                string color = place switch { 1 => "#f9e2af", 2 => "#bac2de", 3 => "#fab387", _ => "#a6adc8" };
+                double blockHeight = place switch { 1 => 180, 2 => 130, 3 => 95, _ => 0 };
+                entries.Add(new PodiumEntry
+                {
+                    Place = place,
+                    PlaceLabel = place switch { 1 => "1st", 2 => "2nd", 3 => "3rd", _ => "4th" },
+                    Medal = medal,
+                    MedalColor = color,
+                    Name = ranked[i].Name,
+                    Score = ranked[i].TotalScore,
+                    BlockHeight = blockHeight
+                });
+            }
+            return entries;
+        }
+    }
     
     private bool _showScoringExplanation;
     public bool ShowScoringExplanation
@@ -523,6 +883,14 @@ public class MainViewModel : INotifyPropertyChanged
     // Score inputs
     public int[] CurrentInputs { get; } = new int[4];
 
+    // Salade additional inputs (only used in Salade contract):
+    // tricks per player, queens per player, hearts per player (excluding Ace, like Hearts contract)
+    public int[] SaladeTricksInputs { get; } = new int[4];
+    public int[] SaladeQueensInputs { get; } = new int[4];
+    public int[] SaladeHeartsInputs { get; } = new int[4];
+
+    public bool IsSaladeContract => SelectedContract == ContractType.Salade;
+
     // Ace of Hearts holder for Hearts contract
     private Player? _aceOfHeartsPlayer;
     public Player? AceOfHeartsPlayer
@@ -573,7 +941,8 @@ public class MainViewModel : INotifyPropertyChanged
     public bool ShowScoreInputs => SelectedContract != ContractType.Barbu && 
                                    SelectedContract != ContractType.NoLastTwo && 
                                    SelectedContract != ContractType.RavageCity &&
-                                   SelectedContract != ContractType.ChinesePoker;
+                                   SelectedContract != ContractType.ChinesePoker &&
+                                   SelectedContract != ContractType.Salade;
 
     #region Properties
 
@@ -677,6 +1046,7 @@ public class MainViewModel : INotifyPropertyChanged
             OnPropertyChanged(nameof(IsNoLastTwoContract));
             OnPropertyChanged(nameof(IsRavageCityContract));
             OnPropertyChanged(nameof(IsChinesePokerContract));
+            OnPropertyChanged(nameof(IsSaladeContract));
             OnPropertyChanged(nameof(ShowScoreInputs));
             OnPropertyChanged(nameof(SelectedContractName));
             AceOfHeartsPlayer = null;  // Reset when contract changes
@@ -688,6 +1058,10 @@ public class MainViewModel : INotifyPropertyChanged
             Array.Clear(ChinesePokerSettingInputs);
             Array.Clear(ChinesePokerTotalInputs);
             ChinesePokerScoreBySetting = true;  // Reset to default
+            // Reset Salade inputs
+            Array.Clear(SaladeTricksInputs);
+            Array.Clear(SaladeQueensInputs);
+            Array.Clear(SaladeHeartsInputs);
         }
     }
 
@@ -710,6 +1084,7 @@ public class MainViewModel : INotifyPropertyChanged
         ContractType.FanTan => "Finish position (1-4):",
         ContractType.RavageCity => "Most cards in suit:",
         ContractType.ChinesePoker => "Beats won:",
+        ContractType.Salade => "Salade inputs:",
         _ => "Value:"
     };
 
@@ -717,13 +1092,16 @@ public class MainViewModel : INotifyPropertyChanged
     {
         ContractType.Nullo => "Enter the number of tricks each player took",
         ContractType.NoQueens => "Enter the number of Queens each player took",
-        ContractType.Hearts => "Enter the number of Hearts each player took (not counting the Ace of Hearts)",
+        ContractType.Hearts => Contract.SaladeModeEnabled
+            ? "Enter the number of Hearts each player took"
+            : "Enter the number of Hearts each player took (not counting the Ace of Hearts)",
         ContractType.NoLastTwo => "Enter who won the last two tricks",
         ContractType.Barbu => "Select who took the King of Hearts",
         ContractType.Trumps => "Enter the number of tricks each player took",
         ContractType.FanTan => "Enter the order each player went out (1/2/3/4)",
         ContractType.RavageCity => "Select the player(s) who took the most cards in any one suit",
         ContractType.ChinesePoker => "Enter the number of Beats per player per Setting",
+        ContractType.Salade => "Enter tricks, queens, and hearts per player. Select who took the last trick and the King of Hearts.",
         _ => "Enter the values"
     };
 
@@ -776,6 +1154,56 @@ public class MainViewModel : INotifyPropertyChanged
 
     public bool HasError => !string.IsNullOrEmpty(ErrorMessage);
 
+    // ── Save toast ──────────────────────────────────────────
+    private DispatcherTimer? _saveToastTimer;
+    private bool _showSaveToast;
+    public bool ShowSaveToast
+    {
+        get => _showSaveToast;
+        private set { _showSaveToast = value; OnPropertyChanged(); }
+    }
+
+    private void TriggerSaveToast()
+    {
+        ShowSaveToast = true;
+        _saveToastTimer ??= new DispatcherTimer { Interval = TimeSpan.FromSeconds(3) };
+        _saveToastTimer.Tick -= OnSaveToastTick;
+        _saveToastTimer.Tick += OnSaveToastTick;
+        _saveToastTimer.Stop();
+        _saveToastTimer.Start();
+    }
+
+    private void OnSaveToastTick(object? sender, EventArgs e)
+    {
+        _saveToastTimer?.Stop();
+        ShowSaveToast = false;
+    }
+
+    // ── Load toast ──────────────────────────────────────────
+    private DispatcherTimer? _loadToastTimer;
+    private bool _showLoadToast;
+    public bool ShowLoadToast
+    {
+        get => _showLoadToast;
+        private set { _showLoadToast = value; OnPropertyChanged(); }
+    }
+
+    private void TriggerLoadToast()
+    {
+        ShowLoadToast = true;
+        _loadToastTimer ??= new DispatcherTimer { Interval = TimeSpan.FromSeconds(3) };
+        _loadToastTimer.Tick -= OnLoadToastTick;
+        _loadToastTimer.Tick += OnLoadToastTick;
+        _loadToastTimer.Stop();
+        _loadToastTimer.Start();
+    }
+
+    private void OnLoadToastTick(object? sender, EventArgs e)
+    {
+        _loadToastTimer?.Stop();
+        ShowLoadToast = false;
+    }
+
     public Player? CurrentBiddingPlayer
     {
         get => _currentBiddingPlayer;
@@ -810,9 +1238,27 @@ public class MainViewModel : INotifyPropertyChanged
         ? $"{CurrentPendingRedouble.Target.Name}: {CurrentPendingRedouble.Doubler.Name} doubled you. Redouble?"
         : "";
 
-    // Total rounds: 28 standard, 32 with Ravage City (8 contracts), 36 with Chinese Poker (9 contracts)
-    public int TotalRounds => ChinesePokerEnabled ? 36 : (RavageCityEnabled ? 32 : 28);
-    
+    // Total rounds: 24 in Salade mode (6 contracts), 28 standard, 32 with Ravage City (8 contracts), 36 with Chinese Poker (9 contracts)
+    public int TotalRounds => IsSaladeMode ? 24 : (ChinesePokerEnabled ? 36 : (RavageCityEnabled ? 32 : 28));
+
+    /// <summary>Number of contract columns shown per dealer in the scorecard.</summary>
+    public int ContractsPerDealerForMode => IsSaladeMode ? 6 : (ChinesePokerEnabled ? 9 : (RavageCityEnabled ? 8 : 7));
+
+    /// <summary>Scale factor for the scorecard so all contract columns fit horizontally without scrolling.</summary>
+    public double ScorecardScale => 0.85 * (7.0 / ContractsPerDealerForMode);
+
+    /// <summary>User-facing label of the active game type, derived from GameMode and optional rule flags.</summary>
+    public string GameTypeDisplay
+    {
+        get
+        {
+            if (IsSaladeMode) return "Game type: Salade";
+            if (ChinesePokerEnabled) return "Game type: Standard + Ravage City + Chinese Poker";
+            if (RavageCityEnabled) return "Game type: Standard + Ravage City";
+            return "Game type: Standard";
+        }
+    }
+
     public bool IsGameComplete => HandHistory.Count >= TotalRounds;
 
     #endregion
@@ -832,15 +1278,32 @@ public class MainViewModel : INotifyPropertyChanged
     public ICommand ToggleDoubleTargetCommand { get; }
     public ICommand ToggleSettingsMenuCommand { get; }
     public ICommand SaveGameCommand { get; }
+    public ICommand SaveGameAsCommand { get; }
+    public ICommand ConfirmSaveAsCommand { get; }
+    public ICommand CancelSaveAsCommand { get; }
+    public ICommand ConfirmOverwriteSaveAsCommand { get; }
+    public ICommand CancelOverwriteSaveAsCommand { get; }
     public ICommand LoadGameCommand { get; }
     public ICommand OpenGameSettingsCommand { get; }
     public ICommand CloseSettingsCommand { get; }
+    public ICommand DiscardSettingsCommand { get; }
+    public ICommand ConfirmDiscardSettingsCommand { get; }
+    public ICommand CancelDiscardSettingsCommand { get; }
     public ICommand SetTextSizeCommand { get; }
     public ICommand SelectSettingsTabCommand { get; }
     public ICommand CloseSettingsMenuCommand { get; }
     public ICommand StartEditScoreCommand { get; }
     public ICommand ConfirmEditScoreCommand { get; }
     public ICommand CancelEditScoreCommand { get; }
+    public ICommand EditFinalScoreCommand { get; }
+    public ICommand EditInputsCommand { get; }
+    public ICommand EditBidCommand { get; }
+    public ICommand CancelEditChooserCommand { get; }
+    public ICommand ConfirmEditInputsCommand { get; }
+    public ICommand CancelEditInputsCommand { get; }
+    public ICommand ConfirmEditBidCommand { get; }
+    public ICommand CancelEditBidCommand { get; }
+    public ICommand BackToEditBidCommand { get; }
     public ICommand ConfirmSummaryCommand { get; }
     public ICommand BackToScoreInputCommand { get; }
     public ICommand BackToBiddingCommand { get; }
@@ -858,6 +1321,9 @@ public class MainViewModel : INotifyPropertyChanged
     public ICommand CancelLoadGameCommand { get; }
     public ICommand ToggleSaveDeleteMenuCommand { get; }
     public ICommand DeleteSavedGameCommand { get; }
+    public ICommand BeginRenameSavedGameCommand { get; }
+    public ICommand ConfirmRenameSavedGameCommand { get; }
+    public ICommand CancelRenameSavedGameCommand { get; }
     public ICommand DismissSaveConfirmationCommand { get; }
 
     #endregion
@@ -883,18 +1349,38 @@ public class MainViewModel : INotifyPropertyChanged
         CancelLoadGameCommand = new RelayCommand(() => ShowLoadGamePicker = false);
         ToggleSaveDeleteMenuCommand = new RelayCommand<SavedGameInfo>(ToggleSaveDeleteMenu);
         DeleteSavedGameCommand = new RelayCommand<SavedGameInfo>(DeleteSavedGame);
+        BeginRenameSavedGameCommand = new RelayCommand<SavedGameInfo>(BeginRenameSavedGame);
+        ConfirmRenameSavedGameCommand = new RelayCommand(ConfirmRenameSavedGame);
+        CancelRenameSavedGameCommand = new RelayCommand(() => { ShowRenameSavedGamePrompt = false; RenameSavedGameError = null; _savedGameBeingRenamed = null; });
         ToggleDoubleTargetCommand = new RelayCommand<DoubleTargetInfo>(ToggleDoubleTarget);
         ToggleSettingsMenuCommand = new RelayCommand(() => IsSettingsMenuOpen = !IsSettingsMenuOpen);
         SaveGameCommand = new RelayCommand(SaveGame);
+        SaveGameAsCommand = new RelayCommand(OpenSaveAsPrompt);
+        ConfirmSaveAsCommand = new RelayCommand(ConfirmSaveAs);
+        CancelSaveAsCommand = new RelayCommand(() => { ShowSaveAsPrompt = false; SaveAsErrorMessage = null; });
+        ConfirmOverwriteSaveAsCommand = new RelayCommand(ConfirmOverwriteSaveAs);
+        CancelOverwriteSaveAsCommand = new RelayCommand(() => { ShowOverwriteSaveAsPrompt = false; _pendingSaveAsPath = null; _pendingSaveAsName = null; });
         LoadGameCommand = new RelayCommand(LoadGame);
         OpenGameSettingsCommand = new RelayCommand(OpenGameSettings);
-        CloseSettingsCommand = new RelayCommand(() => IsSettingsOpen = false);
+        CloseSettingsCommand = new RelayCommand(() => { _settingsSnapshot = null; IsSettingsOpen = false; });
+        DiscardSettingsCommand = new RelayCommand(TryDiscardSettings);
+        ConfirmDiscardSettingsCommand = new RelayCommand(ConfirmDiscardSettings);
+        CancelDiscardSettingsCommand = new RelayCommand(() => ShowDiscardSettingsPrompt = false);
         SetTextSizeCommand = new RelayCommand<TextSize>(size => SelectedTextSize = size);
         SelectSettingsTabCommand = new RelayCommand<string>(tabStr => { if (int.TryParse(tabStr, out int tab)) SelectedSettingsTab = tab; });
         CloseSettingsMenuCommand = new RelayCommand(() => IsSettingsMenuOpen = false);
         StartEditScoreCommand = new RelayCommand<ScorecardRow>(StartEditScore);
         ConfirmEditScoreCommand = new RelayCommand(ConfirmEditScore);
         CancelEditScoreCommand = new RelayCommand(() => { IsEditingScore = false; RowBeingEdited = null; });
+        EditFinalScoreCommand = new RelayCommand(OpenFinalScoreEditor);
+        EditInputsCommand = new RelayCommand(StartCombinedEdit);
+        EditBidCommand = new RelayCommand(StartCombinedEdit); // legacy alias; same flow
+        CancelEditChooserCommand = new RelayCommand(() => { IsEditChooserOpen = false; RowBeingEdited = null; });
+        ConfirmEditInputsCommand = new RelayCommand(ConfirmEditInputs);
+        CancelEditInputsCommand = new RelayCommand(() => { IsEditingInputs = false; IsEditingBid = false; RowBeingEdited = null; EditInputsError = null; EditBidError = null; });
+        ConfirmEditBidCommand = new RelayCommand(ContinueEditBidToInputs);
+        CancelEditBidCommand = new RelayCommand(() => { IsEditingBid = false; IsEditingInputs = false; RowBeingEdited = null; EditBidError = null; EditInputsError = null; });
+        BackToEditBidCommand = new RelayCommand(() => { IsEditingInputs = false; IsEditingBid = true; EditInputsError = null; });
         ConfirmSummaryCommand = new RelayCommand(ConfirmSummary);
         BackToScoreInputCommand = new RelayCommand(BackToScoreInput);
         BackToBiddingCommand = new RelayCommand(BackToBiddingMatrix);
@@ -947,7 +1433,34 @@ public class MainViewModel : INotifyPropertyChanged
             if (toRemove != null)
                 AllContractOptions.Remove(toRemove);
         }
-        
+
+        // Salade mode: add Salade contract and remove Trumps/FanTan
+        var hasSalade = AllContractOptions.Any(o => o.Type == ContractType.Salade);
+        if (IsSaladeMode)
+        {
+            if (!hasSalade)
+                AllContractOptions.Add(new ContractOption { Type = ContractType.Salade });
+            // Remove Trumps and FanTan in Salade mode
+            foreach (var ct in new[] { ContractType.Trumps, ContractType.FanTan })
+            {
+                var toRemove = AllContractOptions.FirstOrDefault(o => o.Type == ct);
+                if (toRemove != null) AllContractOptions.Remove(toRemove);
+            }
+        }
+        else
+        {
+            if (hasSalade)
+            {
+                var toRemove = AllContractOptions.FirstOrDefault(o => o.Type == ContractType.Salade);
+                if (toRemove != null) AllContractOptions.Remove(toRemove);
+            }
+            // Re-add Trumps/FanTan if missing
+            if (!AllContractOptions.Any(o => o.Type == ContractType.Trumps))
+                AllContractOptions.Add(new ContractOption { Type = ContractType.Trumps });
+            if (!AllContractOptions.Any(o => o.Type == ContractType.FanTan))
+                AllContractOptions.Add(new ContractOption { Type = ContractType.FanTan });
+        }
+
         // Refresh all option descriptions (scoring changes with Ravage City/Chinese Poker mode)
         foreach (var option in AllContractOptions)
         {
@@ -960,21 +1473,23 @@ public class MainViewModel : INotifyPropertyChanged
         var settings = AppSettings.Load();
         _selectedTextSize = settings.TextSize;
         _dealerAllowedToDouble = settings.DealerAllowedToDouble;
-        _gameMode = settings.GameMode;
+        _gameMode = GameMode.Standard;
         _barbuVersion = settings.BarbuVersion;
-        _ravageCityEnabled = settings.RavageCityEnabled;
-        _chinesePokerEnabled = settings.ChinesePokerEnabled;
+        _ravageCityEnabled = false;
+        _chinesePokerEnabled = false;
         _fanTanScore1st = settings.FanTanScore1st;
         _fanTanScore2nd = settings.FanTanScore2nd;
         _fanTanScore3rd = settings.FanTanScore3rd;
         _fanTanScore4th = settings.FanTanScore4th;
+        _fanTanRcScore1st = settings.FanTanRcScore1st;
+        _fanTanRcScore2nd = settings.FanTanRcScore2nd;
+        _fanTanRcScore3rd = settings.FanTanRcScore3rd;
+        _fanTanRcScore4th = settings.FanTanRcScore4th;
         Contract.CurrentVersion = _barbuVersion;
         Contract.RavageCityModeEnabled = _ravageCityEnabled;
         Contract.ChinesePokerModeEnabled = _chinesePokerEnabled;
-        Contract.FanTanScore1st = _fanTanScore1st;
-        Contract.FanTanScore2nd = _fanTanScore2nd;
-        Contract.FanTanScore3rd = _fanTanScore3rd;
-        Contract.FanTanScore4th = _fanTanScore4th;
+        Contract.SaladeModeEnabled = _gameMode == GameMode.Salade;
+        SyncActiveFanTanToContract();
         OnPropertyChanged(nameof(SelectedTextSize));
         OnPropertyChanged(nameof(DealerAllowedToDouble));
         OnPropertyChanged(nameof(RavageCityEnabled));
@@ -991,6 +1506,11 @@ public class MainViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(NotSaladeMode));
         OnPropertyChanged(nameof(IsClassicNames));
         OnPropertyChanged(nameof(IsModernNames));
+        OnPropertyChanged(nameof(FanTanScoringHeader));
+        OnPropertyChanged(nameof(FanTanContractName));
+        OnPropertyChanged(nameof(TotalRounds));
+        OnPropertyChanged(nameof(ContractsPerDealerForMode));
+        OnPropertyChanged(nameof(ScorecardScale));
         OnPropertyChanged(nameof(BaseFontSize));
         OnPropertyChanged(nameof(SmallFontSize));
         OnPropertyChanged(nameof(MediumFontSize));
@@ -1015,14 +1535,15 @@ public class MainViewModel : INotifyPropertyChanged
         {
             TextSize = SelectedTextSize,
             DealerAllowedToDouble = DealerAllowedToDouble,
-            GameMode = GameMode,
             BarbuVersion = BarbuVersion,
-            RavageCityEnabled = RavageCityEnabled,
-            ChinesePokerEnabled = ChinesePokerEnabled,
             FanTanScore1st = FanTanScore1st,
             FanTanScore2nd = FanTanScore2nd,
             FanTanScore3rd = FanTanScore3rd,
-            FanTanScore4th = FanTanScore4th
+            FanTanScore4th = FanTanScore4th,
+            FanTanRcScore1st = FanTanRcScore1st,
+            FanTanRcScore2nd = FanTanRcScore2nd,
+            FanTanRcScore3rd = FanTanRcScore3rd,
+            FanTanRcScore4th = FanTanRcScore4th
         };
         settings.Save();
     }
@@ -1063,6 +1584,216 @@ public class MainViewModel : INotifyPropertyChanged
         }
     }
 
+    // ── Save As ─────────────────────────────────────────────
+    private bool _showSaveAsPrompt;
+    public bool ShowSaveAsPrompt
+    {
+        get => _showSaveAsPrompt;
+        set { _showSaveAsPrompt = value; OnPropertyChanged(); }
+    }
+
+    private string _saveAsName = string.Empty;
+    public string SaveAsName
+    {
+        get => _saveAsName;
+        set { _saveAsName = value; OnPropertyChanged(); SaveAsErrorMessage = null; }
+    }
+
+    private string? _saveAsErrorMessage;
+    public string? SaveAsErrorMessage
+    {
+        get => _saveAsErrorMessage;
+        set { _saveAsErrorMessage = value; OnPropertyChanged(); OnPropertyChanged(nameof(HasSaveAsError)); }
+    }
+    public bool HasSaveAsError => !string.IsNullOrEmpty(_saveAsErrorMessage);
+
+    private bool _showOverwriteSaveAsPrompt;
+    public bool ShowOverwriteSaveAsPrompt
+    {
+        get => _showOverwriteSaveAsPrompt;
+        set { _showOverwriteSaveAsPrompt = value; OnPropertyChanged(); }
+    }
+
+    private string? _pendingSaveAsPath;
+    private string? _pendingSaveAsName;
+    public string OverwriteSaveAsName => _pendingSaveAsName ?? string.Empty;
+
+    // === Rename saved game state ===
+    private SavedGameInfo? _savedGameBeingRenamed;
+
+    private bool _showRenameSavedGamePrompt;
+    public bool ShowRenameSavedGamePrompt
+    {
+        get => _showRenameSavedGamePrompt;
+        set { _showRenameSavedGamePrompt = value; OnPropertyChanged(); }
+    }
+
+    private string _renameSavedGameName = string.Empty;
+    public string RenameSavedGameName
+    {
+        get => _renameSavedGameName;
+        set { _renameSavedGameName = value; OnPropertyChanged(); RenameSavedGameError = null; }
+    }
+
+    private string? _renameSavedGameError;
+    public string? RenameSavedGameError
+    {
+        get => _renameSavedGameError;
+        set { _renameSavedGameError = value; OnPropertyChanged(); OnPropertyChanged(nameof(HasRenameSavedGameError)); }
+    }
+
+    public bool HasRenameSavedGameError => !string.IsNullOrEmpty(_renameSavedGameError);
+
+    private void BeginRenameSavedGame(SavedGameInfo? savedGame)
+    {
+        if (savedGame == null) return;
+        savedGame.IsShowingDeleteOption = false;
+        _savedGameBeingRenamed = savedGame;
+        RenameSavedGameName = savedGame.DisplayName;
+        RenameSavedGameError = null;
+        ShowRenameSavedGamePrompt = true;
+    }
+
+    private void ConfirmRenameSavedGame()
+    {
+        if (_savedGameBeingRenamed is not SavedGameInfo target) return;
+
+        var newName = (RenameSavedGameName ?? string.Empty).Trim();
+        if (string.IsNullOrWhiteSpace(newName))
+        {
+            RenameSavedGameError = "Please enter a name.";
+            return;
+        }
+
+        try
+        {
+            var dir = System.IO.Path.GetDirectoryName(target.FilePath) ?? AppDomain.CurrentDomain.BaseDirectory;
+            var sanitized = string.Join("_", newName.Split(System.IO.Path.GetInvalidFileNameChars()));
+            var newPath = System.IO.Path.Combine(dir, $"{sanitized}.barbu");
+
+            if (!string.Equals(newPath, target.FilePath, StringComparison.OrdinalIgnoreCase)
+                && System.IO.File.Exists(newPath))
+            {
+                RenameSavedGameError = "A saved game with that name already exists.";
+                return;
+            }
+
+            // Update the GameName inside the save file's JSON.
+            var json = System.IO.File.ReadAllText(target.FilePath);
+            var saveData = GameSaveData.Deserialize(json);
+            if (saveData != null)
+            {
+                saveData.GameName = newName;
+                System.IO.File.WriteAllText(target.FilePath, GameSaveData.Serialize(saveData));
+            }
+
+            // Move the file if the path changed.
+            var oldPath = target.FilePath;
+            if (!string.Equals(newPath, oldPath, StringComparison.OrdinalIgnoreCase))
+            {
+                System.IO.File.Move(oldPath, newPath);
+            }
+
+            target.FilePath = newPath;
+            target.GameName = newName;
+
+            // If the renamed file is the current auto-save target, keep them in sync.
+            if (!string.IsNullOrEmpty(_autoSaveFilePath)
+                && string.Equals(_autoSaveFilePath, oldPath, StringComparison.OrdinalIgnoreCase))
+            {
+                _autoSaveFilePath = newPath;
+                GameName = newName;
+            }
+
+            ShowRenameSavedGamePrompt = false;
+            RenameSavedGameError = null;
+            _savedGameBeingRenamed = null;
+        }
+        catch (Exception ex)
+        {
+            RenameSavedGameError = $"Failed to rename: {ex.Message}";
+        }
+    }
+
+    private void OpenSaveAsPrompt()
+    {
+        IsSettingsMenuOpen = false;
+        SaveAsName = string.IsNullOrWhiteSpace(GameName) ? "" : $"{GameName} (copy)";
+        SaveAsErrorMessage = null;
+        ShowSaveAsPrompt = true;
+    }
+
+    private void ConfirmSaveAs()
+    {
+        var name = (SaveAsName ?? string.Empty).Trim();
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            SaveAsErrorMessage = "Please enter a name.";
+            return;
+        }
+
+        try
+        {
+            var appDir = AppDomain.CurrentDomain.BaseDirectory;
+            var sanitizedName = string.Join("_", name.Split(System.IO.Path.GetInvalidFileNameChars()));
+            var newPath = System.IO.Path.Combine(appDir, $"{sanitizedName}.barbu");
+
+            if (System.IO.File.Exists(newPath)
+                && !string.Equals(newPath, _autoSaveFilePath, StringComparison.OrdinalIgnoreCase))
+            {
+                _pendingSaveAsPath = newPath;
+                _pendingSaveAsName = name;
+                OnPropertyChanged(nameof(OverwriteSaveAsName));
+                ShowOverwriteSaveAsPrompt = true;
+                return;
+            }
+
+            PerformSaveAs(newPath, name);
+        }
+        catch (Exception ex)
+        {
+            SaveAsErrorMessage = $"Failed to save: {ex.Message}";
+        }
+    }
+
+    private void ConfirmOverwriteSaveAs()
+    {
+        if (string.IsNullOrEmpty(_pendingSaveAsPath) || string.IsNullOrEmpty(_pendingSaveAsName))
+        {
+            ShowOverwriteSaveAsPrompt = false;
+            return;
+        }
+
+        try
+        {
+            PerformSaveAs(_pendingSaveAsPath!, _pendingSaveAsName!);
+            ShowOverwriteSaveAsPrompt = false;
+            _pendingSaveAsPath = null;
+            _pendingSaveAsName = null;
+        }
+        catch (Exception ex)
+        {
+            ShowOverwriteSaveAsPrompt = false;
+            SaveAsErrorMessage = $"Failed to save: {ex.Message}";
+        }
+    }
+
+    private void PerformSaveAs(string newPath, string name)
+    {
+        // Update the in-memory game name so the new file's contents reflect it,
+        // then redirect the auto-save target to the new file.
+        GameName = name;
+        _autoSaveFilePath = newPath;
+
+        var saveData = CreateSaveData();
+        var json = GameSaveData.Serialize(saveData);
+        System.IO.File.WriteAllText(newPath, json);
+
+        ShowSaveAsPrompt = false;
+        SaveAsErrorMessage = null;
+        TriggerSaveToast();
+    }
+
     private void LoadGame()
     {
         IsSettingsMenuOpen = false;
@@ -1087,13 +1818,17 @@ public class MainViewModel : INotifyPropertyChanged
                             FilePath = filePath,
                             GameName = saveData.GameName,
                             CurrentHandNumber = saveData.CurrentHandNumber,
-                            SavedAt = saveData.SavedAt
+                            SavedAt = saveData.SavedAt,
+                            TotalRounds = saveData.GameMode == "Salade" ? 24
+                                : saveData.ChinesePokerEnabled ? 36
+                                : saveData.RavageCityEnabled ? 32
+                                : 28
                         });
                     }
                 }
-                catch
+                catch (Exception ex)
                 {
-                    // Skip corrupted files
+                    System.Diagnostics.Debug.WriteLine($"Skipping corrupt save file '{filePath}': {ex.Message}");
                 }
             }
             
@@ -1105,9 +1840,9 @@ public class MainViewModel : INotifyPropertyChanged
                 SavedGames.Add(game);
             }
         }
-        catch
+        catch (Exception ex)
         {
-            // Failed to scan directory
+            System.Diagnostics.Debug.WriteLine($"Failed to scan saved games: {ex.Message}");
         }
         
         if (SavedGames.Count == 0)
@@ -1132,7 +1867,9 @@ public class MainViewModel : INotifyPropertyChanged
             if (saveData != null)
             {
                 RestoreFromSaveData(saveData);
+                SelectedMainTab = 0;
                 StatusMessage = "Game loaded successfully!";
+                TriggerLoadToast();
             }
         }
         catch (Exception ex)
@@ -1186,7 +1923,7 @@ public class MainViewModel : INotifyPropertyChanged
         {
             GameName = GameName,
             CurrentDealerIndex = CurrentDealer?.Index ?? 0,
-            CurrentHandNumber = _currentHandNumber,
+            CurrentHandNumber = Math.Min(_currentHandNumber, TotalRounds),
             Phase = CurrentPhase.ToString(),
             SelectedContract = SelectedContract?.ToString(),
             SavedAt = DateTime.Now,
@@ -1200,7 +1937,11 @@ public class MainViewModel : INotifyPropertyChanged
             FanTanScore1st = FanTanScore1st,
             FanTanScore2nd = FanTanScore2nd,
             FanTanScore3rd = FanTanScore3rd,
-            FanTanScore4th = FanTanScore4th
+            FanTanScore4th = FanTanScore4th,
+            FanTanRcScore1st = FanTanRcScore1st,
+            FanTanRcScore2nd = FanTanRcScore2nd,
+            FanTanRcScore3rd = FanTanRcScore3rd,
+            FanTanRcScore4th = FanTanRcScore4th
         };
 
         // Save current doubles if in bidding or entering scores phase
@@ -1233,7 +1974,19 @@ public class MainViewModel : INotifyPropertyChanged
                 HandNumber = hand.HandNumber,
                 Contract = hand.Contract.ToString(),
                 DealerIndex = hand.Dealer.Index,
-                Scores = hand.PlayerScores.ToList()
+                Scores = hand.PlayerScores.ToList(),
+                RawInputs = hand.RawInputs.ToList(),
+                AceOfHeartsPlayerIndex = hand.AceOfHeartsPlayerIndex,
+                KingOfHeartsPlayerIndex = hand.KingOfHeartsPlayerIndex,
+                LastTrickPlayerIndex = hand.LastTrickPlayerIndex,
+                SecondToLastTrickPlayerIndex = hand.SecondToLastTrickPlayerIndex,
+                SaladeTricks = hand.SaladeTricks?.ToList(),
+                SaladeQueens = hand.SaladeQueens?.ToList(),
+                SaladeHearts = hand.SaladeHearts?.ToList(),
+                RavageCityPlayerIndices = hand.RavageCityPlayerIndices?.ToList(),
+                ChinesePokerScoreBySetting = hand.ChinesePokerScoreBySetting,
+                ChinesePokerSettingInputs = hand.ChinesePokerSettingInputs?.ToList(),
+                ChinesePokerTotalInputs = hand.ChinesePokerTotalInputs?.ToList()
             };
             foreach (var d in hand.Doubles)
             {
@@ -1259,6 +2012,7 @@ public class MainViewModel : INotifyPropertyChanged
             var saveData = CreateSaveData();
             var json = GameSaveData.Serialize(saveData);
             System.IO.File.WriteAllText(_autoSaveFilePath, json);
+            TriggerSaveToast();
         }
         catch
         {
@@ -1266,7 +2020,7 @@ public class MainViewModel : INotifyPropertyChanged
         }
     }
 
-    private void InitializeAutoSave()
+    private void InitializeAutoSave(bool saveImmediately = true)
     {
         if (string.IsNullOrWhiteSpace(GameName)) return;
         
@@ -1280,8 +2034,9 @@ public class MainViewModel : INotifyPropertyChanged
             
             _autoSaveFilePath = System.IO.Path.Combine(appDir, $"{sanitizedName}.barbu");
             
-            // Create initial save file
-            AutoSave();
+            // Create initial save file (skip when restoring an existing save — file already on disk)
+            if (saveImmediately)
+                AutoSave();
         }
         catch
         {
@@ -1331,7 +2086,19 @@ public class MainViewModel : INotifyPropertyChanged
                 HandNumber = hd.HandNumber,
                 Contract = Enum.Parse<ContractType>(hd.Contract),
                 Dealer = dealer,
-                PlayerScores = hd.Scores.ToArray()
+                PlayerScores = hd.Scores.ToArray(),
+                RawInputs = hd.RawInputs?.ToArray() ?? new int[4],
+                AceOfHeartsPlayerIndex = hd.AceOfHeartsPlayerIndex,
+                KingOfHeartsPlayerIndex = hd.KingOfHeartsPlayerIndex,
+                LastTrickPlayerIndex = hd.LastTrickPlayerIndex,
+                SecondToLastTrickPlayerIndex = hd.SecondToLastTrickPlayerIndex,
+                SaladeTricks = hd.SaladeTricks?.ToArray(),
+                SaladeQueens = hd.SaladeQueens?.ToArray(),
+                SaladeHearts = hd.SaladeHearts?.ToArray(),
+                RavageCityPlayerIndices = hd.RavageCityPlayerIndices?.ToList(),
+                ChinesePokerScoreBySetting = hd.ChinesePokerScoreBySetting,
+                ChinesePokerSettingInputs = hd.ChinesePokerSettingInputs?.ToArray(),
+                ChinesePokerTotalInputs = hd.ChinesePokerTotalInputs?.ToArray()
             };
             foreach (var dd in hd.Doubles)
             {
@@ -1347,7 +2114,7 @@ public class MainViewModel : INotifyPropertyChanged
 
         // Restore game state
         CurrentDealer = Players.FirstOrDefault(p => p.Index == data.CurrentDealerIndex);
-        _currentHandNumber = data.CurrentHandNumber;
+        CurrentHandNumber = data.CurrentHandNumber;
         CurrentPhase = Enum.Parse<GamePhase>(data.Phase);
         CurrentScreen = GameScreen.GamePlay;
 
@@ -1365,15 +2132,17 @@ public class MainViewModel : INotifyPropertyChanged
         _fanTanScore2nd = data.FanTanScore2nd;
         _fanTanScore3rd = data.FanTanScore3rd;
         _fanTanScore4th = data.FanTanScore4th;
+        _fanTanRcScore1st = data.FanTanRcScore1st;
+        _fanTanRcScore2nd = data.FanTanRcScore2nd;
+        _fanTanRcScore3rd = data.FanTanRcScore3rd;
+        _fanTanRcScore4th = data.FanTanRcScore4th;
         
         // Sync static Contract settings
         Contract.CurrentVersion = _barbuVersion;
         Contract.RavageCityModeEnabled = _ravageCityEnabled;
         Contract.ChinesePokerModeEnabled = _chinesePokerEnabled;
-        Contract.FanTanScore1st = _fanTanScore1st;
-        Contract.FanTanScore2nd = _fanTanScore2nd;
-        Contract.FanTanScore3rd = _fanTanScore3rd;
-        Contract.FanTanScore4th = _fanTanScore4th;
+        Contract.SaladeModeEnabled = _gameMode == GameMode.Salade;
+        SyncActiveFanTanToContract();
         
         // Notify UI of settings changes
         OnPropertyChanged(nameof(SelectedTextSize));
@@ -1392,6 +2161,11 @@ public class MainViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(NotSaladeMode));
         OnPropertyChanged(nameof(IsClassicNames));
         OnPropertyChanged(nameof(IsModernNames));
+        OnPropertyChanged(nameof(FanTanScoringHeader));
+        OnPropertyChanged(nameof(FanTanContractName));
+        OnPropertyChanged(nameof(TotalRounds));
+        OnPropertyChanged(nameof(ContractsPerDealerForMode));
+        OnPropertyChanged(nameof(ScorecardScale));
         OnPropertyChanged(nameof(BaseFontSize));
         OnPropertyChanged(nameof(SmallFontSize));
         OnPropertyChanged(nameof(MediumFontSize));
@@ -1399,6 +2173,9 @@ public class MainViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(XLargeFontSize));
         OnPropertyChanged(nameof(XXLargeFontSize));
         OnPropertyChanged(nameof(HugeFontSize));
+
+        // Refresh contract options (adds/removes Ravage City, Chinese Poker, Salade, etc. and updates names)
+        RefreshContractOptions();
 
         // Rebuild scorecard and dealer double matrix
         InitializeScorecard();
@@ -1410,6 +2187,7 @@ public class MainViewModel : INotifyPropertyChanged
             UpdateScorecardFromHand(hand);
             UpdateDealerDoubleMatrixFromHand(hand);
         }
+        RefreshMostRecentMarker();
 
         // Update available contracts for current dealer
         UpdateAvailableContracts();
@@ -1442,8 +2220,10 @@ public class MainViewModel : INotifyPropertyChanged
         // Save settings so they persist
         SaveSettings();
         
-        // Setup auto-save for loaded game
-        InitializeAutoSave();
+        // Setup auto-save for loaded game (don't re-save immediately — file is already on disk)
+        InitializeAutoSave(saveImmediately: false);
+        OnPropertyChanged(nameof(IsGameComplete));
+        OnPropertyChanged(nameof(PodiumEntries));
     }
 
     private void UpdateScorecardFromHand(HandResult hand)
@@ -1461,17 +2241,17 @@ public class MainViewModel : INotifyPropertyChanged
             
             cell.Score = hand.PlayerScores[i];
             
-            // Find doubles made by this player (not redoubled) - use Index for comparison after load
+            // Original double appears on the doubler's cell (yellow circle, target's initial)
             var doubles = hand.Doubles
-                .Where(d => d.Doubler.Index == player.Index && !d.IsRedoubled)
+                .Where(d => d.Doubler.Index == player.Index)
                 .Select(d => d.Target.Position.ToInitial())
                 .ToList();
             cell.DoubledTargets = doubles;
             
-            // Find redoubles made by this player
+            // Redouble appears on the target's (redoubler's) cell (red diamond, original doubler's initial)
             var redoubles = hand.Doubles
-                .Where(d => d.Doubler.Index == player.Index && d.IsRedoubled)
-                .Select(d => d.Target.Position.ToInitial())
+                .Where(d => d.Target.Index == player.Index && d.IsRedoubled)
+                .Select(d => d.Doubler.Position.ToInitial())
                 .ToList();
             cell.RedoubledTargets = redoubles;
         }
@@ -1501,24 +2281,451 @@ public class MainViewModel : INotifyPropertyChanged
     private void OpenGameSettings()
     {
         IsSettingsMenuOpen = false;
-        SelectedSettingsTab = 0;
+        SelectedSettingsTab = 1;
+        _settingsSnapshot = CaptureSettingsSnapshot();
         IsSettingsOpen = true;
+    }
+
+    private AppSettings CaptureSettingsSnapshot() => new AppSettings
+    {
+        TextSize = SelectedTextSize,
+        DealerAllowedToDouble = DealerAllowedToDouble,
+        GameMode = GameMode,
+        BarbuVersion = BarbuVersion,
+        RavageCityEnabled = RavageCityEnabled,
+        ChinesePokerEnabled = ChinesePokerEnabled,
+        FanTanScore1st = FanTanScore1st,
+        FanTanScore2nd = FanTanScore2nd,
+        FanTanScore3rd = FanTanScore3rd,
+        FanTanScore4th = FanTanScore4th,
+        FanTanRcScore1st = FanTanRcScore1st,
+        FanTanRcScore2nd = FanTanRcScore2nd,
+        FanTanRcScore3rd = FanTanRcScore3rd,
+        FanTanRcScore4th = FanTanRcScore4th,
+    };
+
+    private bool HasSettingsChangesSinceOpen()
+    {
+        if (_settingsSnapshot is not AppSettings s) return false;
+        return s.TextSize != SelectedTextSize
+            || s.DealerAllowedToDouble != DealerAllowedToDouble
+            || s.GameMode != GameMode
+            || s.BarbuVersion != BarbuVersion
+            || s.RavageCityEnabled != RavageCityEnabled
+            || s.ChinesePokerEnabled != ChinesePokerEnabled
+            || s.FanTanScore1st != FanTanScore1st
+            || s.FanTanScore2nd != FanTanScore2nd
+            || s.FanTanScore3rd != FanTanScore3rd
+            || s.FanTanScore4th != FanTanScore4th
+            || s.FanTanRcScore1st != FanTanRcScore1st
+            || s.FanTanRcScore2nd != FanTanRcScore2nd
+            || s.FanTanRcScore3rd != FanTanRcScore3rd
+            || s.FanTanRcScore4th != FanTanRcScore4th;
+    }
+
+    private void TryDiscardSettings()
+    {
+        if (HasSettingsChangesSinceOpen())
+        {
+            ShowDiscardSettingsPrompt = true;
+        }
+        else
+        {
+            _settingsSnapshot = null;
+            IsSettingsOpen = false;
+        }
+    }
+
+    private void ConfirmDiscardSettings()
+    {
+        if (_settingsSnapshot is AppSettings s)
+        {
+            // Revert each property to its snapshot value. Each setter will re-save settings.
+            SelectedTextSize = s.TextSize;
+            DealerAllowedToDouble = s.DealerAllowedToDouble;
+            GameMode = s.GameMode;
+            BarbuVersion = s.BarbuVersion;
+            RavageCityEnabled = s.RavageCityEnabled;
+            ChinesePokerEnabled = s.ChinesePokerEnabled;
+            FanTanScore1st = s.FanTanScore1st;
+            FanTanScore2nd = s.FanTanScore2nd;
+            FanTanScore3rd = s.FanTanScore3rd;
+            FanTanScore4th = s.FanTanScore4th;
+            FanTanRcScore1st = s.FanTanRcScore1st;
+            FanTanRcScore2nd = s.FanTanRcScore2nd;
+            FanTanRcScore3rd = s.FanTanRcScore3rd;
+            FanTanRcScore4th = s.FanTanRcScore4th;
+        }
+        _settingsSnapshot = null;
+        ShowDiscardSettingsPrompt = false;
+        IsSettingsOpen = false;
     }
 
     private void StartEditScore(ScorecardRow? row)
     {
         if (row == null || !row.IsPlayed) return;
-        
+
         RowBeingEdited = row;
         EditErrorMessage = null;
-        
+        IsEditChooserOpen = true;
+    }
+
+    private void OpenFinalScoreEditor()
+    {
+        if (RowBeingEdited == null) return;
+
         // Pre-populate edit inputs with current scores
         for (int i = 0; i < 4; i++)
         {
-            EditInputs[i] = row.PlayerCells[i].Score ?? 0;
+            EditInputs[i] = RowBeingEdited.PlayerCells[i].Score ?? 0;
         }
-        
+
+        IsEditChooserOpen = false;
         IsEditingScore = true;
+    }
+
+    /// <summary>
+    /// Combined Edit Inputs flow: opens the bid editor first (Continue/Cancel),
+    /// which transitions to the contract-input editor (Back/Save) on Continue.
+    /// </summary>
+    private void StartCombinedEdit()
+    {
+        if (RowBeingEdited == null) return;
+        var hand = HandHistory.FirstOrDefault(h =>
+            h.Dealer == RowBeingEdited.Dealer && h.Contract == RowBeingEdited.Contract);
+        if (hand == null)
+        {
+            EditBidError = "Could not find matching hand in history.";
+            return;
+        }
+
+        // Pre-fill both editors so Back/Continue can move freely between them.
+        BuildEditDoublingMatrix(hand);
+        PrefillEditInputsFromHand(hand);
+
+        EditBidError = null;
+        EditInputsError = null;
+        IsEditChooserOpen = false;
+        IsEditingInputs = false;
+        IsEditingBid = true;
+    }
+
+    /// <summary>Continue from the bid step to the input step (no save yet).</summary>
+    private void ContinueEditBidToInputs()
+    {
+        EditBidError = null;
+        IsEditingBid = false;
+        IsEditingInputs = true;
+    }
+
+    private void PrefillEditInputsFromHand(HandResult hand)
+    {
+        for (int i = 0; i < 4; i++) EditInputs[i] = hand.RawInputs.Length > i ? hand.RawInputs[i] : 0;
+
+        if (hand.SaladeTricks != null) Array.Copy(hand.SaladeTricks, EditSaladeTricks, 4);
+        else Array.Clear(EditSaladeTricks);
+        if (hand.SaladeQueens != null) Array.Copy(hand.SaladeQueens, EditSaladeQueens, 4);
+        else Array.Clear(EditSaladeQueens);
+        if (hand.SaladeHearts != null) Array.Copy(hand.SaladeHearts, EditSaladeHearts, 4);
+        else Array.Clear(EditSaladeHearts);
+
+        EditAceOfHeartsPlayer = ResolvePlayer(hand.AceOfHeartsPlayerIndex);
+        EditKingOfHeartsPlayer = ResolvePlayer(hand.KingOfHeartsPlayerIndex);
+        EditLastTrickPlayer = ResolvePlayer(hand.LastTrickPlayerIndex);
+        EditSecondToLastTrickPlayer = ResolvePlayer(hand.SecondToLastTrickPlayerIndex);
+
+        EditRavageCitySelections.Clear();
+        foreach (var p in Players)
+        {
+            EditRavageCitySelections.Add(new RavageCityPlayerSelection
+            {
+                Player = p,
+                IsSelected = hand.RavageCityPlayerIndices?.Contains(p.Index) == true
+            });
+        }
+
+        EditChinesePokerScoreBySetting = hand.ChinesePokerScoreBySetting ?? true;
+        if (hand.ChinesePokerSettingInputs != null && hand.ChinesePokerSettingInputs.Length == 12)
+        {
+            for (int p = 0; p < 4; p++)
+                for (int s = 0; s < 3; s++)
+                    EditChinesePokerSetting[p, s] = hand.ChinesePokerSettingInputs[p * 3 + s];
+        }
+        else Array.Clear(EditChinesePokerSetting);
+        if (hand.ChinesePokerTotalInputs != null) Array.Copy(hand.ChinesePokerTotalInputs, EditChinesePokerTotal, 4);
+        else Array.Clear(EditChinesePokerTotal);
+    }
+
+    private Player? ResolvePlayer(int? index) =>
+        index.HasValue ? Players.FirstOrDefault(p => p.Index == index.Value) : null;
+
+    private void ConfirmEditInputs()
+    {
+        if (RowBeingEdited == null) return;
+
+        var hand = HandHistory.FirstOrDefault(h =>
+            h.Dealer == RowBeingEdited.Dealer && h.Contract == RowBeingEdited.Contract);
+        if (hand == null)
+        {
+            EditInputsError = "Could not find matching hand in history.";
+            return;
+        }
+
+        var err = ValidateEditInputs(hand.Contract);
+        if (err != null) { EditInputsError = err; return; }
+
+        // Collect doubles from the edited matrix (combined-flow Step 1).
+        var newDoubles = new List<DoubleBid>();
+        foreach (var row in EditDoublingMatrix)
+        {
+            foreach (var cell in row.Cells)
+            {
+                if (cell.IsEmpty || !cell.IsDouble) continue;
+                newDoubles.Add(new DoubleBid
+                {
+                    Doubler = cell.Doubler,
+                    Target = cell.Target,
+                    IsRedoubled = cell.EffectiveRedouble
+                });
+            }
+        }
+
+        // Build a candidate hand reflecting the edits so we can recompute pure-functionally.
+        var candidate = new HandResult
+        {
+            HandNumber = hand.HandNumber,
+            Dealer = hand.Dealer,
+            Contract = hand.Contract,
+            RawInputs = (int[])EditInputs.Clone(),
+            Doubles = newDoubles,
+            AceOfHeartsPlayerIndex = EditAceOfHeartsPlayer?.Index,
+            KingOfHeartsPlayerIndex = EditKingOfHeartsPlayer?.Index,
+            LastTrickPlayerIndex = EditLastTrickPlayer?.Index,
+            SecondToLastTrickPlayerIndex = EditSecondToLastTrickPlayer?.Index
+        };
+
+        switch (hand.Contract)
+        {
+            case ContractType.Salade:
+                candidate.SaladeTricks = (int[])EditSaladeTricks.Clone();
+                candidate.SaladeQueens = (int[])EditSaladeQueens.Clone();
+                candidate.SaladeHearts = (int[])EditSaladeHearts.Clone();
+                break;
+            case ContractType.RavageCity:
+                candidate.RavageCityPlayerIndices = EditRavageCitySelections
+                    .Where(s => s.IsSelected).Select(s => s.Player.Index).ToList();
+                break;
+            case ContractType.ChinesePoker:
+                candidate.ChinesePokerScoreBySetting = EditChinesePokerScoreBySetting;
+                var flat = new int[12];
+                for (int p = 0; p < 4; p++)
+                    for (int s = 0; s < 3; s++)
+                        flat[p * 3 + s] = EditChinesePokerSetting[p, s];
+                candidate.ChinesePokerSettingInputs = flat;
+                candidate.ChinesePokerTotalInputs = (int[])EditChinesePokerTotal.Clone();
+                break;
+        }
+
+        var baseScores = candidate.RecomputeBaseScores(CurrentScoringContext);
+        if (baseScores == null)
+        {
+            EditInputsError = "Unable to compute scores from these inputs.";
+            return;
+        }
+        var newFinal = HandResult.ApplyDoubles(baseScores, candidate.Doubles);
+
+        // Diff against the previously stored final scores and adjust running totals.
+        int[] oldScores = (int[])hand.PlayerScores.Clone();
+        for (int i = 0; i < 4; i++)
+        {
+            Players[i].TotalScore -= oldScores[i];
+            Players[i].TotalScore += newFinal[i];
+        }
+
+        // Apply the candidate fields onto the stored hand.
+        hand.RawInputs = candidate.RawInputs;
+        hand.Doubles = candidate.Doubles;
+        hand.AceOfHeartsPlayerIndex = candidate.AceOfHeartsPlayerIndex;
+        hand.KingOfHeartsPlayerIndex = candidate.KingOfHeartsPlayerIndex;
+        hand.LastTrickPlayerIndex = candidate.LastTrickPlayerIndex;
+        hand.SecondToLastTrickPlayerIndex = candidate.SecondToLastTrickPlayerIndex;
+        hand.SaladeTricks = candidate.SaladeTricks;
+        hand.SaladeQueens = candidate.SaladeQueens;
+        hand.SaladeHearts = candidate.SaladeHearts;
+        hand.RavageCityPlayerIndices = candidate.RavageCityPlayerIndices;
+        hand.ChinesePokerScoreBySetting = candidate.ChinesePokerScoreBySetting;
+        hand.ChinesePokerSettingInputs = candidate.ChinesePokerSettingInputs;
+        hand.ChinesePokerTotalInputs = candidate.ChinesePokerTotalInputs;
+        hand.PlayerScores = newFinal;
+
+        // Refresh the scorecard cells.
+        for (int i = 0; i < 4; i++)
+            RowBeingEdited.PlayerCells[i].Score = newFinal[i];
+
+        // Doubles may have changed, so refresh the persistent dealer-doubles tracker.
+        RebuildDealerDoubleMatrixFromHistory();
+
+        StatusMessage = "Hand inputs updated and scores recomputed.";
+        EditInputsError = null;
+        IsEditingInputs = false;
+        IsEditingBid = false;
+        RowBeingEdited = null;
+        OnPropertyChanged(nameof(PodiumEntries));
+        AutoSave();
+    }
+
+    private string? ValidateEditInputs(ContractType contract)
+    {
+        switch (contract)
+        {
+            case ContractType.Nullo:
+                if (EditInputs.Sum() != 13) return $"Total tricks must equal 13. You entered {EditInputs.Sum()}.";
+                break;
+            case ContractType.NoQueens:
+                if (EditInputs.Sum() != 4) return $"Total queens must equal 4. You entered {EditInputs.Sum()}.";
+                break;
+            case ContractType.Hearts:
+                if (IsSaladeMode)
+                {
+                    if (EditInputs.Sum() != 13) return $"Total hearts must equal 13. You entered {EditInputs.Sum()}.";
+                }
+                else
+                {
+                    if (EditInputs.Sum() != 12) return $"Total hearts (excluding Ace) must equal 12. You entered {EditInputs.Sum()}.";
+                    if (EditAceOfHeartsPlayer == null) return "Please select which player won the Ace of Hearts.";
+                }
+                break;
+            case ContractType.Trumps:
+                if (EditInputs.Sum() != 13) return $"Total tricks must equal 13. You entered {EditInputs.Sum()}.";
+                break;
+            case ContractType.FanTan:
+                var positions = EditInputs.OrderBy(x => x).ToArray();
+                if (!positions.SequenceEqual(new[] { 1, 2, 3, 4 }))
+                    return "Each player must have a unique finish position (1-4).";
+                break;
+            case ContractType.NoLastTwo:
+                if (IsSaladeMode)
+                {
+                    if (EditLastTrickPlayer == null) return "Please select who won the last trick.";
+                }
+                else
+                {
+                    if (EditSecondToLastTrickPlayer == null) return "Please select who won the 2nd to last trick.";
+                    if (EditLastTrickPlayer == null) return "Please select who won the last trick.";
+                }
+                break;
+            case ContractType.Barbu:
+                if (EditKingOfHeartsPlayer == null) return "Please select who won the King of Hearts.";
+                break;
+            case ContractType.Salade:
+                if (EditSaladeTricks.Sum() != 13) return $"Total tricks must equal 13. You entered {EditSaladeTricks.Sum()}.";
+                if (EditSaladeQueens.Sum() != 4) return $"Total queens must equal 4. You entered {EditSaladeQueens.Sum()}.";
+                if (EditSaladeHearts.Sum() != 13) return $"Total hearts must equal 13. You entered {EditSaladeHearts.Sum()}.";
+                if (EditLastTrickPlayer == null) return "Please select who won the last trick.";
+                if (EditKingOfHeartsPlayer == null) return "Please select who won the King of Hearts.";
+                break;
+            case ContractType.RavageCity:
+                if (!EditRavageCitySelections.Any(s => s.IsSelected))
+                    return "Please select at least one player who took the most cards in any suit.";
+                break;
+            case ContractType.ChinesePoker:
+                if (EditChinesePokerScoreBySetting)
+                {
+                    for (int s = 0; s < 3; s++)
+                    {
+                        int sum = 0;
+                        for (int p = 0; p < 4; p++) sum += EditChinesePokerSetting[p, s];
+                        string name = s switch { 0 => "Front", 1 => "Middle", _ => "Back" };
+                        if (sum != 6) return $"{name} beats must sum to 6. You entered {sum}.";
+                    }
+                }
+                else
+                {
+                    int total = EditChinesePokerTotal.Sum();
+                    if (total != 18) return $"Total beats must equal 18. You entered {total}.";
+                }
+                break;
+        }
+        return null;
+    }
+
+    private void OpenEditBid()
+    {
+        // Legacy entry point retained for backward compat; routes through the combined flow.
+        StartCombinedEdit();
+    }
+
+    /// <summary>
+    /// Builds a static-data doubling matrix pre-filled from a hand's stored Doubles.
+    /// No mandatory-double logic; row labels use the hand's dealer for the "Dealer" badge.
+    /// </summary>
+    private void BuildEditDoublingMatrix(HandResult hand)
+    {
+        EditDoublingMatrix.Clear();
+        EditDoublingMatrixHeaders.Clear();
+        if (Players.Count < 4) return;
+
+        var dealer = hand.Dealer;
+        var ordered = new List<Player>();
+        var pos = dealer.Position.NextClockwise();
+        for (int i = 0; i < 4; i++)
+        {
+            ordered.Add(GetPlayerByPosition(pos));
+            pos = pos.NextClockwise();
+        }
+
+        foreach (var p in ordered)
+            EditDoublingMatrixHeaders.Add(new DoublingMatrixHeader { Player = p });
+
+        foreach (var doubler in ordered)
+        {
+            var row = new DoublingMatrixRow { Doubler = doubler };
+            foreach (var target in ordered)
+            {
+                var cell = new DoublingMatrixCell { Doubler = doubler, Target = target };
+                if (cell.IsEmpty)
+                {
+                    cell.IsDoubleEnabled = false;
+                    row.Cells.Add(cell);
+                    continue;
+                }
+
+                // Pre-fill from existing doubles for this hand.
+                var existing = hand.Doubles.FirstOrDefault(d =>
+                    d.Doubler.Index == doubler.Index && d.Target.Index == target.Index);
+                if (existing != null)
+                {
+                    cell.IsDouble = true;
+                    if (existing.IsRedoubled) cell.IsRedouble = true;
+                }
+
+                row.Cells.Add(cell);
+            }
+
+            row.MaxCommand = new RelayCommand(() => MaxDoublesForRow(row));
+            row.IsDealerLocked = (doubler.Index == dealer.Index) && !DealerAllowedToDouble;
+            row.IsDealer = doubler.Index == dealer.Index;
+            EditDoublingMatrix.Add(row);
+        }
+
+        // Wire up inverse cells for the same UX as live bidding.
+        foreach (var row in EditDoublingMatrix)
+        {
+            foreach (var cell in row.Cells)
+            {
+                if (cell.IsEmpty) continue;
+                var mirrorRow = EditDoublingMatrix.FirstOrDefault(r => r.Doubler.Index == cell.Target.Index);
+                if (mirrorRow == null) continue;
+                cell.InverseCell = mirrorRow.Cells.FirstOrDefault(c => c.Target.Index == cell.Doubler.Index);
+            }
+        }
+    }
+
+    private void RebuildDealerDoubleMatrixFromHistory()
+    {
+        InitializeDealerDoubleMatrix();
+        foreach (var h in HandHistory)
+            UpdateDealerDoubleMatrixFromHand(h);
     }
 
     private void ConfirmEditScore()
@@ -1536,22 +2743,22 @@ public class MainViewModel : INotifyPropertyChanged
             return;
         }
         
-        // Get expected checksum for this contract
-        int expectedSum = RowBeingEdited.Contract switch
+        // Get expected checksum for this contract using the row's mode-aware logic.
+        // Contracts whose validation is structural (e.g. NoLastTwo, Barbu, RavageCity, Salade,
+        // ChinesePoker) are not bounded by a simple "scores must sum to X" rule and are skipped.
+        int? expectedSumNullable = RowBeingEdited.Contract switch
         {
-            ContractType.Nullo => -26,
-            ContractType.NoQueens => -24,
-            ContractType.Hearts => -30,
-            ContractType.NoLastTwo => -30,
-            ContractType.Barbu => -20,
-            ContractType.Trumps => 65,
-            ContractType.FanTan => 65,
-            _ => 0
+            ContractType.Nullo => RowBeingEdited.ExpectedCheckSum,
+            ContractType.NoQueens => RowBeingEdited.ExpectedCheckSum,
+            ContractType.Hearts => RowBeingEdited.ExpectedCheckSum,
+            ContractType.Trumps => RowBeingEdited.ExpectedCheckSum,
+            ContractType.FanTan => RowBeingEdited.ExpectedCheckSum,
+            _ => null
         };
-        
-        // Validate the sum of entered scores
+
+        // Validate the sum of entered scores when an expected sum is defined.
         int actualSum = EditInputs.Sum();
-        if (actualSum != expectedSum)
+        if (expectedSumNullable is int expectedSum && actualSum != expectedSum)
         {
             EditErrorMessage = $"Scores must sum to {expectedSum}. Currently: {actualSum}";
             return;
@@ -1586,6 +2793,9 @@ public class MainViewModel : INotifyPropertyChanged
         RowBeingEdited = null;
         StatusMessage = "Score updated successfully!";
         
+        // Refresh Final Standings podium in case the game is over and totals shifted.
+        OnPropertyChanged(nameof(PodiumEntries));
+
         // Auto-save after manual score edit
         AutoSave();
     }
@@ -1676,6 +2886,14 @@ public class MainViewModel : INotifyPropertyChanged
             ContractType.Trumps, 
             ContractType.FanTan 
         };
+
+        // Salade mode: replace Trumps/FanTan with the Salade combo contract
+        if (IsSaladeMode)
+        {
+            contractTypes.Remove(ContractType.Trumps);
+            contractTypes.Remove(ContractType.FanTan);
+            contractTypes.Add(ContractType.Salade);
+        }
         
         // Add RavageCity when enabled
         if (RavageCityEnabled)
@@ -1707,6 +2925,16 @@ public class MainViewModel : INotifyPropertyChanged
                 section.Rows.Add(row);
             }
             
+            // Build transposed view: one PlayerRowView per player, holding that
+            // player's cell from each row (in row/contract order).
+            section.PlayerRows = Players
+                .Select((p, i) => new PlayerRowView
+                {
+                    Player = p,
+                    Cells = section.Rows.Select(r => r.PlayerCells[i]).ToList()
+                })
+                .ToList();
+            
             Scorecard.Add(section);
         }
     }
@@ -1729,22 +2957,36 @@ public class MainViewModel : INotifyPropertyChanged
             
             cell.Score = result.PlayerScores[i];
             
-            // Find doubles made by this player (not redoubled)
+            // Original double appears on the doubler's cell (yellow circle, target's initial)
             var doubles = result.Doubles
-                .Where(d => d.Doubler == player && !d.IsRedoubled)
+                .Where(d => d.Doubler == player)
                 .Select(d => d.Target.Position.ToInitial())
                 .ToList();
             cell.DoubledTargets = doubles;
             
-            // Find redoubles made by this player
+            // Redouble appears on the target's (redoubler's) cell (red diamond, original doubler's initial)
             var redoubles = result.Doubles
-                .Where(d => d.Doubler == player && d.IsRedoubled)
-                .Select(d => d.Target.Position.ToInitial())
+                .Where(d => d.Target == player && d.IsRedoubled)
+                .Select(d => d.Doubler.Position.ToInitial())
                 .ToList();
             cell.RedoubledTargets = redoubles;
         }
         
         row.IsPlayed = true;
+    }
+
+    private void RefreshMostRecentMarker()
+    {
+        var last = HandHistory.LastOrDefault();
+        foreach (var section in Scorecard)
+        {
+            foreach (var row in section.Rows)
+            {
+                row.IsMostRecent = last != null
+                    && row.Dealer.Index == last.Dealer.Index
+                    && row.Contract == last.Contract;
+            }
+        }
     }
 
     private void RefreshScorecardNames()
@@ -1777,17 +3019,17 @@ public class MainViewModel : INotifyPropertyChanged
             var player = Players[i];
             var cell = row.PlayerCells[i];
             
-            // Find doubles made by this player (not redoubled) - use Index for comparison
+            // Original double appears on the doubler's cell (yellow circle, target's initial)
             var doubles = BiddingState.Doubles
-                .Where(d => d.Doubler.Index == player.Index && !d.IsRedoubled)
+                .Where(d => d.Doubler.Index == player.Index)
                 .Select(d => d.Target.Position.ToInitial())
                 .ToList();
             cell.DoubledTargets = doubles;
             
-            // Find redoubles made by this player
+            // Redouble appears on the target's (redoubler's) cell (red diamond, original doubler's initial)
             var redoubles = BiddingState.Doubles
-                .Where(d => d.Doubler.Index == player.Index && d.IsRedoubled)
-                .Select(d => d.Target.Position.ToInitial())
+                .Where(d => d.Target.Index == player.Index && d.IsRedoubled)
+                .Select(d => d.Doubler.Position.ToInitial())
                 .ToList();
             cell.RedoubledTargets = redoubles;
         }
@@ -1879,7 +3121,7 @@ public class MainViewModel : INotifyPropertyChanged
                 {
                     int currentDoubleCount = GetDoubleCountForDealerPair(doubler, dealer);
                     int doublesNeeded = 2 - currentDoubleCount;
-                    int gamesRemainingForDealer = 7 - dealer.DealtContracts.Count;
+                    int gamesRemainingForDealer = ContractsPerDealerForMode - dealer.DealtContracts.Count;
                     if (gamesRemainingForDealer <= doublesNeeded && doublesNeeded > 0)
                     {
                         cell.IsMandatory = true;
@@ -1891,7 +3133,23 @@ public class MainViewModel : INotifyPropertyChanged
             }
 
             row.MaxCommand = new RelayCommand(() => MaxDoublesForRow(row));
+            row.IsDealerLocked = (doubler.Index == dealer.Index) && !DealerAllowedToDouble;
+            row.IsDealer = doubler.Index == dealer.Index;
             DoublingMatrix.Add(row);
+        }
+
+        // Wire up inverse-cell relationships so each cell knows about its mirror
+        // (e.g., cell[A][B] <-> cell[B][A]). Used to enforce: if A doubles B, then
+        // B's row → A's column shows only Re-Dbl, not Dbl.
+        foreach (var row in DoublingMatrix)
+        {
+            foreach (var cell in row.Cells)
+            {
+                if (cell.IsEmpty) continue;
+                var mirrorRow = DoublingMatrix.FirstOrDefault(r => r.Doubler.Index == cell.Target.Index);
+                if (mirrorRow == null) continue;
+                cell.InverseCell = mirrorRow.Cells.FirstOrDefault(c => c.Target.Index == cell.Doubler.Index);
+            }
         }
     }
 
@@ -2003,7 +3261,7 @@ public class MainViewModel : INotifyPropertyChanged
                     {
                         int currentDoubleCount = GetDoubleCountForDealerPair(bidder, dealer);
                         int doublesNeeded = 2 - currentDoubleCount;
-                        int gamesRemainingForDealer = 7 - dealer.DealtContracts.Count;  // Current game not yet added
+                        int gamesRemainingForDealer = ContractsPerDealerForMode - dealer.DealtContracts.Count;  // Current game not yet added
                         
                         // If remaining games equals doubles needed, this one is mandatory
                         if (gamesRemainingForDealer <= doublesNeeded && doublesNeeded > 0)
@@ -2314,6 +3572,13 @@ public class MainViewModel : INotifyPropertyChanged
     {
         if (CurrentDealer == null || !SelectedContract.HasValue) return;
 
+        // Guard against entering scores past the final round.
+        if (IsGameComplete)
+        {
+            ErrorMessage = "Game is already complete. No more scores can be submitted.";
+            return;
+        }
+
         ErrorMessage = "";
 
         // Validate scores
@@ -2420,14 +3685,47 @@ public class MainViewModel : INotifyPropertyChanged
     {
         if (CurrentDealer == null || !SelectedContract.HasValue) return;
 
+        // Defensive: don't append a hand if the game is already complete.
+        if (IsGameComplete)
+        {
+            CurrentPhase = GamePhase.SelectingContract;
+            return;
+        }
+
         var result = new HandResult
         {
             HandNumber = CurrentHandNumber,
             Dealer = CurrentDealer,
             Contract = SelectedContract.Value,
             RawInputs = (int[])CurrentInputs.Clone(),
-            Doubles = BiddingState.Doubles.ToList()
+            Doubles = BiddingState.Doubles.ToList(),
+            AceOfHeartsPlayerIndex = AceOfHeartsPlayer?.Index,
+            KingOfHeartsPlayerIndex = KingOfHeartsPlayer?.Index,
+            LastTrickPlayerIndex = LastTrickPlayer?.Index,
+            SecondToLastTrickPlayerIndex = SecondToLastTrickPlayer?.Index
         };
+
+        // Capture per-contract auxiliary inputs so the hand can be re-edited later.
+        switch (SelectedContract.Value)
+        {
+            case ContractType.Salade:
+                result.SaladeTricks = (int[])SaladeTricksInputs.Clone();
+                result.SaladeQueens = (int[])SaladeQueensInputs.Clone();
+                result.SaladeHearts = (int[])SaladeHeartsInputs.Clone();
+                break;
+            case ContractType.RavageCity:
+                result.RavageCityPlayerIndices = SelectedRavageCityPlayers.Select(p => p.Index).ToList();
+                break;
+            case ContractType.ChinesePoker:
+                result.ChinesePokerScoreBySetting = ChinesePokerScoreBySetting;
+                var flat = new int[12];
+                for (int p = 0; p < 4; p++)
+                    for (int s = 0; s < 3; s++)
+                        flat[p * 3 + s] = ChinesePokerSettingInputs[p, s];
+                result.ChinesePokerSettingInputs = flat;
+                result.ChinesePokerTotalInputs = (int[])ChinesePokerTotalInputs.Clone();
+                break;
+        }
         
         result.PlayerScores = SummaryFinalScores.ToArray();
 
@@ -2444,13 +3742,16 @@ public class MainViewModel : INotifyPropertyChanged
         // Update dealer doubles matrix
         UpdateDealerDoubleMatrix(CurrentDealer, BiddingState.Doubles.ToList());
 
-        HandHistory.Add(result);
-        
+        HandHistory.Add(result);        
         // Update history scorecard
         UpdateScorecard(result);
+        RefreshMostRecentMarker();
         
         // Clear inputs for next hand
         Array.Clear(CurrentInputs);
+        Array.Clear(SaladeTricksInputs);
+        Array.Clear(SaladeQueensInputs);
+        Array.Clear(SaladeHeartsInputs);
         BiddingState.Reset();
         
         // Reset special card holders
@@ -2468,6 +3769,7 @@ public class MainViewModel : INotifyPropertyChanged
         {
             var winner = Players.OrderByDescending(p => p.TotalScore).First();
             StatusMessage = $"Game Over! {winner.Name} wins with {winner.TotalScore} points!";
+            OnPropertyChanged(nameof(PodiumEntries));
         }
         
         // Auto-save after confirming scores
@@ -2555,57 +3857,89 @@ public class MainViewModel : INotifyPropertyChanged
                 expectedTotal = 13;
                 itemName = "tricks";
                 if (total != expectedTotal)
-                    return $"Error: Total tricks must equal {expectedTotal}. You entered {total} {itemName}. Please fix the scoring.";
+                    return $"Total tricks must equal {expectedTotal}. You entered {total} {itemName}. Please fix the scoring.";
                 break;
 
             case ContractType.NoQueens:
                 expectedTotal = 4;
                 itemName = "queens";
                 if (total != expectedTotal)
-                    return $"Error: Total queens must equal {expectedTotal}. You entered {total} {itemName}. Please fix the scoring. (Total points should be -24)";
+                    return $"Total queens must equal {expectedTotal}. You entered {total} {itemName}. Please fix the scoring. (Total points should be -24)";
                 break;
 
             case ContractType.Hearts:
+                if (IsSaladeMode)
+                {
+                    // Salade: all 13 hearts count at -10; no separate Ace handling.
+                    expectedTotal = 13;
+                    itemName = "hearts";
+                    if (total != expectedTotal)
+                        return $"Total hearts must equal {expectedTotal}. You entered {total} {itemName}. Please fix the scoring.";
+                    break;
+                }
                 expectedTotal = 12;  // 13 hearts minus the Ace which is tracked separately
                 itemName = "hearts (not including Ace)";
                 if (total != expectedTotal)
-                    return $"Error: Total hearts must equal {expectedTotal}. You entered {total} {itemName}. Please fix the scoring.";
+                    return $"Total hearts must equal {expectedTotal}. You entered {total} {itemName}. Please fix the scoring.";
                 if (AceOfHeartsPlayer == null)
-                    return "Error: Please select which player won the Ace of Hearts.";
+                    return "Please select which player won the Ace of Hearts.";
                 break;
 
             case ContractType.NoLastTwo:
+                if (IsSaladeMode)
+                {
+                    if (LastTrickPlayer == null)
+                        return "Please select which player won the last trick.";
+                    break;
+                }
                 if (SecondToLastTrickPlayer == null)
-                    return "Error: Please select which player won the 2nd to last trick.";
+                    return "Please select which player won the 2nd to last trick.";
                 if (LastTrickPlayer == null)
-                    return "Error: Please select which player won the last trick.";
+                    return "Please select which player won the last trick.";
                 break;
 
             case ContractType.Barbu:
                 if (KingOfHeartsPlayer == null)
-                    return "Error: Please select which player won the King of Hearts.";
+                    return "Please select which player won the King of Hearts.";
                 break;
 
             case ContractType.Trumps:
                 expectedTotal = 13;
                 itemName = "tricks";
                 if (total != expectedTotal)
-                    return $"Error: Total tricks must equal {expectedTotal}. You entered {total} {itemName}. Please fix the scoring.";
+                    return $"Total tricks must equal {expectedTotal}. You entered {total} {itemName}. Please fix the scoring.";
                 break;
 
             case ContractType.FanTan:
                 // Check that positions 1-4 are each used exactly once
                 var positions = inputs.OrderBy(x => x).ToArray();
                 if (!positions.SequenceEqual(new[] { 1, 2, 3, 4 }))
-                    return $"Error: Each player must have a unique finish position (1-4). Please fix the scoring.";
+                    return $"Each player must have a unique finish position (1-4). Please fix the scoring.";
                 break;
                 
             case ContractType.RavageCity:
                 // At least one player must be selected
                 if (!SelectedRavageCityPlayers.Any())
-                    return "Error: Please select at least one player who took the most cards in any suit.";
+                    return "Please select at least one player who took the most cards in any suit.";
                 break;
-                
+
+            case ContractType.Salade:
+                {
+                    int tricks = SaladeTricksInputs.Sum();
+                    int queens = SaladeQueensInputs.Sum();
+                    int hearts = SaladeHeartsInputs.Sum();
+                    if (tricks != 13)
+                        return $"Total tricks must equal 13. You entered {tricks}. Please fix the scoring.";
+                    if (queens != 4)
+                        return $"Total queens must equal 4. You entered {queens}. Please fix the scoring.";
+                    if (hearts != 13)
+                        return $"Total hearts must equal 13. You entered {hearts}. Please fix the scoring.";
+                    if (LastTrickPlayer == null)
+                        return "Please select which player won the last trick.";
+                    if (KingOfHeartsPlayer == null)
+                        return "Please select which player won the King of Hearts.";
+                }
+                break;
             case ContractType.ChinesePoker:
                 if (ChinesePokerScoreBySetting)
                 {
@@ -2619,7 +3953,7 @@ public class MainViewModel : INotifyPropertyChanged
                         }
                         string settingName = setting switch { 0 => "Front", 1 => "Middle", _ => "Back" };
                         if (settingTotal != 6)
-                            return $"Error: {settingName} beats must sum to 6. You entered {settingTotal}. Please fix the scoring.";
+                            return $"{settingName} beats must sum to 6. You entered {settingTotal}. Please fix the scoring.";
                     }
                 }
                 else
@@ -2627,7 +3961,7 @@ public class MainViewModel : INotifyPropertyChanged
                     // Total beats across all players must equal 18
                     int totalBeats = ChinesePokerTotalInputs.Sum();
                     if (totalBeats != 18)
-                        return $"Error: Total beats must equal 18. You entered {totalBeats}. Please fix the scoring.";
+                        return $"Total beats must equal 18. You entered {totalBeats}. Please fix the scoring.";
                 }
                 break;
         }
@@ -2679,6 +4013,11 @@ public class MainViewModel : INotifyPropertyChanged
         EastName = "";
         SouthName = "";
         _autoSaveFilePath = null;
+        // Game type always defaults to Standard for a fresh game (does not persist).
+        GameMode = GameMode.Standard;
+        RavageCityEnabled = false;
+        ChinesePokerEnabled = false;
+        OnPropertyChanged(nameof(GameTypeDisplay));
         OnPropertyChanged(nameof(IsGameComplete));
         OnPropertyChanged(nameof(CanStartGame));
     }
@@ -2718,6 +4057,7 @@ public class MainViewModel : INotifyPropertyChanged
         if (_pendingRevertGameMode.HasValue)
         {
             _gameMode = _pendingRevertGameMode.Value;
+            Contract.SaladeModeEnabled = _gameMode == GameMode.Salade;
             OnPropertyChanged(nameof(GameMode));
             OnPropertyChanged(nameof(IsStandardMode));
             OnPropertyChanged(nameof(IsSaladeMode));
@@ -2727,6 +4067,13 @@ public class MainViewModel : INotifyPropertyChanged
         
         // Refresh contract options to reflect reverted settings
         RefreshContractOptions();
+        // Notify derived UI bindings (round counts, scale, game-type label, fan tan).
+        OnPropertyChanged(nameof(TotalRounds));
+        OnPropertyChanged(nameof(ContractsPerDealerForMode));
+        OnPropertyChanged(nameof(ScorecardScale));
+        OnPropertyChanged(nameof(GameTypeDisplay));
+        SyncActiveFanTanToContract();
+        NotifyFanTanDerived();
         SaveSettings();
     }
 
@@ -2737,20 +4084,27 @@ public class MainViewModel : INotifyPropertyChanged
         switch (contract)
         {
             case ContractType.Nullo:
-                // -3 per trick with Ravage City or Chinese Poker, -2 otherwise
-                int nulloMultiplier = (ChinesePokerEnabled || RavageCityEnabled) ? -3 : -2;
+                // Salade: -5 per trick. Otherwise -3 with Ravage City/Chinese Poker, -2 standard.
+                int nulloMultiplier = IsSaladeMode ? -5 : ((ChinesePokerEnabled || RavageCityEnabled) ? -3 : -2);
                 for (int i = 0; i < 4; i++)
                     scores[i] = nulloMultiplier * inputs[i];
                 break;
 
             case ContractType.NoQueens:
-                // -12 per queen with Chinese Poker, -8 with Ravage City, -6 otherwise
-                int queenMultiplier = ChinesePokerEnabled ? -12 : (RavageCityEnabled ? -8 : -6);
+                // Salade: -20 per queen. Otherwise -12 (CP), -8 (RC), -6 (standard).
+                int queenMultiplier = IsSaladeMode ? -20 : (ChinesePokerEnabled ? -12 : (RavageCityEnabled ? -8 : -6));
                 for (int i = 0; i < 4; i++)
                     scores[i] = queenMultiplier * inputs[i];
                 break;
 
             case ContractType.Hearts:
+                // Salade: -10 per heart, no extra Ace bonus (Ace is just one of the 13 hearts at -10).
+                if (IsSaladeMode)
+                {
+                    for (int i = 0; i < 4; i++)
+                        scores[i] = -10 * inputs[i];
+                    break;
+                }
                 // -3 per heart, -9 for Ace with Chinese Poker; -2 per heart, -6 for Ace otherwise
                 int heartMultiplier = ChinesePokerEnabled ? -3 : -2;
                 int aceValue = ChinesePokerEnabled ? -9 : -6;
@@ -2763,6 +4117,15 @@ public class MainViewModel : INotifyPropertyChanged
                 break;
 
             case ContractType.NoLastTwo:
+                // Salade: only the last trick matters and it's worth -30.
+                if (IsSaladeMode)
+                {
+                    for (int i = 0; i < 4; i++)
+                    {
+                        scores[i] = (LastTrickPlayer != null && Players[i] == LastTrickPlayer) ? -30 : 0;
+                    }
+                    break;
+                }
                 // -25 for last, -15 for 2nd last with Chinese Poker; -20/-10 otherwise
                 int lastPenalty = ChinesePokerEnabled ? -25 : -20;
                 int secondLastPenalty = ChinesePokerEnabled ? -15 : -10;
@@ -2777,10 +4140,26 @@ public class MainViewModel : INotifyPropertyChanged
                 break;
 
             case ContractType.Barbu:
-                // -30 for King of Hearts with Chinese Poker, -21 with Ravage City, -20 otherwise
-                int barbuScore = ChinesePokerEnabled ? -30 : (RavageCityEnabled ? -21 : -20);
+                // Salade: -50 for King of Hearts. Otherwise -30 (CP), -21 (RC), -20 (standard).
+                int barbuScore = IsSaladeMode ? -50 : (ChinesePokerEnabled ? -30 : (RavageCityEnabled ? -21 : -20));
                 for (int i = 0; i < 4; i++)
                     scores[i] = (KingOfHeartsPlayer != null && Players[i] == KingOfHeartsPlayer) ? barbuScore : 0;
+                break;
+
+            case ContractType.Salade:
+                // Combination: -5 per trick, -20 per queen, -10 per heart,
+                // -30 for last trick, -50 for K\u2665.
+                for (int i = 0; i < 4; i++)
+                {
+                    int s = -5 * SaladeTricksInputs[i]
+                          + -20 * SaladeQueensInputs[i]
+                          + -10 * SaladeHeartsInputs[i];
+                    if (LastTrickPlayer != null && Players[i] == LastTrickPlayer)
+                        s += -30;
+                    if (KingOfHeartsPlayer != null && Players[i] == KingOfHeartsPlayer)
+                        s += -50;
+                    scores[i] = s;
+                }
                 break;
 
             case ContractType.Trumps:
@@ -2869,34 +4248,36 @@ public class MainViewModel : INotifyPropertyChanged
     }
 
     private int[] ApplyDoubles(int[] baseScores, List<DoubleBid> doubles)
-    {
-        int[] finalScores = new int[4];
-        Array.Copy(baseScores, finalScores, 4);
-
-        foreach (var dbl in doubles)
-        {
-            int doublerIdx = dbl.Doubler.Index;
-            int targetIdx = dbl.Target.Index;
-
-            // Calculate the difference
-            int diff = baseScores[targetIdx] - baseScores[doublerIdx];
-            
-            // Multiplier: 2x for double, 4x for redouble
-            int multiplier = dbl.IsRedoubled ? 2 : 1;
-
-            // Transfer points based on outcome
-            finalScores[doublerIdx] -= diff * multiplier;
-            finalScores[targetIdx] += diff * multiplier;
-        }
-
-        return finalScores;
-    }
+        => HandResult.ApplyDoubles(baseScores, doubles);
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
     protected void OnPropertyChanged([CallerMemberName] string? name = null)
     {
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+    }
+
+    public void Dispose()
+    {
+        if (_errorClearTimer != null)
+        {
+            _errorClearTimer.Stop();
+            _errorClearTimer.Tick -= OnErrorClearTick;
+            _errorClearTimer = null;
+        }
+        if (_saveToastTimer != null)
+        {
+            _saveToastTimer.Stop();
+            _saveToastTimer.Tick -= OnSaveToastTick;
+            _saveToastTimer = null;
+        }
+        if (_loadToastTimer != null)
+        {
+            _loadToastTimer.Stop();
+            _loadToastTimer.Tick -= OnLoadToastTick;
+            _loadToastTimer = null;
+        }
+        GC.SuppressFinalize(this);
     }
 }
 

@@ -1,6 +1,4 @@
-﻿using System.Configuration;
-using System.Data;
-using System.IO;
+﻿using System.IO;
 using System.Windows;
 using System.Windows.Threading;
 
@@ -98,9 +96,10 @@ public partial class App : Application
             string finalContent = string.Join(EntrySeparator, entries) + EntrySeparator;
             File.WriteAllText(logPath, finalContent);
         }
-        catch
+        catch (Exception logEx)
         {
-            // Silently fail if we can't log - don't cause another exception
+            // Don't cause another exception while logging; surface to debugger only.
+            System.Diagnostics.Debug.WriteLine($"Failed to write crash log: {logEx.Message}");
         }
     }
 }

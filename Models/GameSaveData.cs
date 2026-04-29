@@ -28,6 +28,10 @@ public class GameSaveData
     public int FanTanScore2nd { get; set; } = 25;
     public int FanTanScore3rd { get; set; } = 10;
     public int FanTanScore4th { get; set; } = -10;
+    public int FanTanRcScore1st { get; set; } = 50;
+    public int FanTanRcScore2nd { get; set; } = 25;
+    public int FanTanRcScore3rd { get; set; } = 10;
+    public int FanTanRcScore4th { get; set; } = 0;
 
     public static string Serialize(GameSaveData data)
     {
@@ -56,6 +60,20 @@ public class HandResultSaveData
     public int DealerIndex { get; set; }
     public List<int> Scores { get; set; } = new();
     public List<DoubleBidSaveData> Doubles { get; set; } = new();
+
+    // Per-contract raw inputs (optional; older saves may omit these).
+    public List<int>? RawInputs { get; set; }
+    public int? AceOfHeartsPlayerIndex { get; set; }
+    public int? KingOfHeartsPlayerIndex { get; set; }
+    public int? LastTrickPlayerIndex { get; set; }
+    public int? SecondToLastTrickPlayerIndex { get; set; }
+    public List<int>? SaladeTricks { get; set; }
+    public List<int>? SaladeQueens { get; set; }
+    public List<int>? SaladeHearts { get; set; }
+    public List<int>? RavageCityPlayerIndices { get; set; }
+    public bool? ChinesePokerScoreBySetting { get; set; }
+    public List<int>? ChinesePokerSettingInputs { get; set; }
+    public List<int>? ChinesePokerTotalInputs { get; set; }
 }
 
 public class DoubleBidSaveData

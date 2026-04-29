@@ -10,7 +10,8 @@ public enum ContractType
     Trumps,         // +5 per trick (or +7 with Ravage City)
     FanTan,         // Points based on finish order
     RavageCity,     // Most cards in any suit scores negative
-    ChinesePoker    // 6 points per beat (requires Ravage City)
+    ChinesePoker,   // 6 points per beat (requires Ravage City)
+    Salade          // Salade variant: combination of all 5 penalty contracts
 }
 
 public class Contract
@@ -18,6 +19,7 @@ public class Contract
     public static BarbuVersion CurrentVersion { get; set; } = BarbuVersion.Classic;
     public static bool RavageCityModeEnabled { get; set; } = false;
     public static bool ChinesePokerModeEnabled { get; set; } = false;
+    public static bool SaladeModeEnabled { get; set; } = false;
     
     // Fan Tan scoring values for dynamic descriptions
     public static int FanTanScore1st { get; set; } = 40;
@@ -42,12 +44,13 @@ public class Contract
             ContractType.Nullo => "No Tricks",
             ContractType.NoQueens => "No Queens",
             ContractType.Hearts => "No Hearts",
-            ContractType.NoLastTwo => "No Last Two",
+            ContractType.NoLastTwo => SaladeModeEnabled ? "No Last Trick" : "No Last Two",
             ContractType.Barbu => "No King of Hearts",
             ContractType.Trumps => "Trumps",
             ContractType.FanTan => "Domino",
             ContractType.RavageCity => "Ravage City",
             ContractType.ChinesePoker => "Chinese Poker",
+            ContractType.Salade => "Salade",
             _ => "Unknown"
         },
         _ => type switch
@@ -55,18 +58,33 @@ public class Contract
             ContractType.Nullo => "Nullo",
             ContractType.NoQueens => "No Queens",
             ContractType.Hearts => "Hearts",
-            ContractType.NoLastTwo => "No Last Two",
+            ContractType.NoLastTwo => SaladeModeEnabled ? "No Last Trick" : "No Last Two",
             ContractType.Barbu => "Barbu",
             ContractType.Trumps => "Trumps",
             ContractType.FanTan => "Fan Tan",
             ContractType.RavageCity => "Ravage City",
             ContractType.ChinesePoker => "Chinese Poker",
+            ContractType.Salade => "Salade",
             _ => "Unknown"
         }
     };
 
     public static string GetDescription(ContractType type)
     {
+        // Salade mode: completely different scoring scheme
+        if (SaladeModeEnabled)
+        {
+            return type switch
+            {
+                ContractType.Nullo => "-5 points per trick taken (-65 total)",
+                ContractType.NoQueens => "-20 points per queen taken (-80 total)",
+                ContractType.Hearts => "-10 points per heart taken (-130 total)",
+                ContractType.NoLastTwo => "-30 points for taking the last trick",
+                ContractType.Barbu => "-50 points for taking the King of Hearts",
+                ContractType.Salade => "All of the above simultaneously (-355)",
+                _ => ""
+            };
+        }
         // Chinese Poker mode takes precedence (it requires Ravage City)
         if (ChinesePokerModeEnabled)
         {
@@ -144,7 +162,7 @@ public class Contract
                 ContractType.NoLastTwo => "-20 points for the last trick. -10 points for the 2nd to last trick",
                 ContractType.Barbu => "-20 points for taking the King of Hearts",
                 ContractType.Trumps => "+5 points per trick won",
-                ContractType.FanTan => "45/20/5/-5 based on finish order",
+                ContractType.FanTan => $"{FanTanScoringDisplay} based on finish order",
                 ContractType.RavageCity => "Most cards in any suit: -24 (ties: -12/-8/-6 each)",
                 ContractType.ChinesePoker => "+6 points per beat (+108 total)",
                 _ => ""
@@ -157,7 +175,7 @@ public class Contract
                 ContractType.NoLastTwo => "-20 points for the last trick. -10 points for the 2nd to last trick",
                 ContractType.Barbu => "-20 points for taking the King of Hearts",
                 ContractType.Trumps => "+5 points per trick won",
-                ContractType.FanTan => "40/25/10/-10 based on finish order",
+                ContractType.FanTan => $"{FanTanScoringDisplay} based on finish order",
                 ContractType.RavageCity => "Most cards in any suit: -24 (ties: -12/-8/-6 each)",
                 ContractType.ChinesePoker => "+6 points per beat (+108 total)",
                 _ => ""
@@ -175,6 +193,21 @@ public class ContractOption : System.ComponentModel.INotifyPropertyChanged
     {
         get
         {
+            // Salade mode takes precedence over other mode flags
+            if (Contract.SaladeModeEnabled)
+            {
+                return Type switch
+                {
+                    ContractType.Nullo => "-5 per trick (-65)",
+                    ContractType.NoQueens => "-20 per queen (-80)",
+                    ContractType.Hearts => "-10 per heart (-130)",
+                    ContractType.NoLastTwo => "-30 for last trick",
+                    ContractType.Barbu => "-50 for King of Hearts",
+                    ContractType.Salade => "All of the above simultaneously (-355)",
+                    _ => ""
+                };
+            }
+
             // Chinese Poker mode takes precedence (requires Ravage City)
             if (Contract.ChinesePokerModeEnabled)
             {
@@ -185,7 +218,7 @@ public class ContractOption : System.ComponentModel.INotifyPropertyChanged
                         ContractType.Nullo => "-3 per trick (-39)",
                         ContractType.NoQueens => "-12 per queen (-48)",
                         ContractType.Hearts => "-3 per heart, -9 Ace (-45)",
-                        ContractType.NoLastTwo => "-25 last, -15 2nd last (-40)",
+                        ContractType.NoLastTwo => "-25 for last trick, -15 for 2nd to last trick (-40)",
                         ContractType.Barbu => "-30 for King of Hearts",
                         ContractType.Trumps => "+5 per trick (+65)",
                         ContractType.FanTan => $"{Contract.FanTanScoringDisplay} (+{Contract.FanTanScoringTotal})",
@@ -198,7 +231,7 @@ public class ContractOption : System.ComponentModel.INotifyPropertyChanged
                         ContractType.Nullo => "-3 per trick (-39)",
                         ContractType.NoQueens => "-12 per queen (-48)",
                         ContractType.Hearts => "-3 per heart, -9 Ace (-45)",
-                        ContractType.NoLastTwo => "-25 last, -15 2nd last (-40)",
+                        ContractType.NoLastTwo => "-25 for last trick, -15 for 2nd to last trick (-40)",
                         ContractType.Barbu => "-30 for King of Hearts",
                         ContractType.Trumps => "+5 per trick (+65)",
                         ContractType.FanTan => $"{Contract.FanTanScoringDisplay} (+{Contract.FanTanScoringTotal})",
@@ -218,7 +251,7 @@ public class ContractOption : System.ComponentModel.INotifyPropertyChanged
                         ContractType.Nullo => "-3 per trick (-39)",
                         ContractType.NoQueens => "-8 per queen (-32)",
                         ContractType.Hearts => "-2 per heart, -6 Ace (-30)",
-                        ContractType.NoLastTwo => "-20 last, -10 2nd last (-30)",
+                        ContractType.NoLastTwo => "-20 for last trick, -10 for 2nd to last trick (-30)",
                         ContractType.Barbu => "-21 for King of Hearts",
                         ContractType.Trumps => "+7 per trick (+91)",
                         ContractType.FanTan => "50/25/10/0 finish (+85)",
@@ -231,7 +264,7 @@ public class ContractOption : System.ComponentModel.INotifyPropertyChanged
                         ContractType.Nullo => "-3 per trick (-39)",
                         ContractType.NoQueens => "-8 per queen (-32)",
                         ContractType.Hearts => "-2 per heart, -6 Ace (-30)",
-                        ContractType.NoLastTwo => "-20 last, -10 2nd last (-30)",
+                        ContractType.NoLastTwo => "-20 for last trick, -10 for 2nd to last trick (-30)",
                         ContractType.Barbu => "-21 for King of Hearts",
                         ContractType.Trumps => "+7 per trick (+91)",
                         ContractType.FanTan => "50/25/10/0 finish (+85)",
@@ -249,10 +282,10 @@ public class ContractOption : System.ComponentModel.INotifyPropertyChanged
                     ContractType.Nullo => "-2 per trick",
                     ContractType.NoQueens => "-6 per queen",
                     ContractType.Hearts => "-2 per heart, -6 for Ace of Hearts",
-                    ContractType.NoLastTwo => "-20 last, -10 2nd last",
+                    ContractType.NoLastTwo => "-20 for last trick, -10 for 2nd to last trick",
                     ContractType.Barbu => "-20 for King of Hearts",
                     ContractType.Trumps => "+5 per trick",
-                    ContractType.FanTan => "45/20/5/-5 finish order",
+                    ContractType.FanTan => $"{Contract.FanTanScoringDisplay} finish order",
                     ContractType.RavageCity => "-24 most cards in suit",
                     ContractType.ChinesePoker => "+6 per beat (+108)",
                     _ => ""
@@ -262,10 +295,10 @@ public class ContractOption : System.ComponentModel.INotifyPropertyChanged
                     ContractType.Nullo => "-2 per trick",
                     ContractType.NoQueens => "-6 per queen",
                     ContractType.Hearts => "-2 per heart, -6 for Ace of Hearts",
-                    ContractType.NoLastTwo => "-20 last, -10 2nd last",
+                    ContractType.NoLastTwo => "-20 for last trick, -10 for 2nd to last trick",
                     ContractType.Barbu => "-20 for King of Hearts",
                     ContractType.Trumps => "+5 per trick",
-                    ContractType.FanTan => "40/25/10/-10 finish order",
+                    ContractType.FanTan => $"{Contract.FanTanScoringDisplay} finish order",
                     ContractType.RavageCity => "-24 most cards in suit",
                     ContractType.ChinesePoker => "+6 per beat (+108)",
                     _ => ""
