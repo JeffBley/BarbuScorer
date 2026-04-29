@@ -20,6 +20,23 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+
+        // Auto-select TextBox contents on focus so users can type over a leading
+        // "0" without first having to clear it. Applies to all TextBoxes in the
+        // window (keyboard tab focus and mouse click).
+        EventManager.RegisterClassHandler(typeof(TextBox),
+            UIElement.GotKeyboardFocusEvent,
+            new RoutedEventHandler((s, e) => { if (s is TextBox tb) tb.SelectAll(); }));
+        EventManager.RegisterClassHandler(typeof(TextBox),
+            UIElement.PreviewMouseLeftButtonDownEvent,
+            new MouseButtonEventHandler((s, e) =>
+            {
+                if (s is TextBox tb && !tb.IsKeyboardFocusWithin)
+                {
+                    e.Handled = true;
+                    tb.Focus(); // triggers GotKeyboardFocus -> SelectAll
+                }
+            }));
         
         // Wire up file dialog actions after DataContext is set
         Loaded += (s, e) =>
@@ -215,9 +232,15 @@ public partial class MainWindow : Window
     {
         if (e.NewValue is not true || DataContext is not MainViewModel vm) return;
 
+        // When the hand has no real raw inputs (auto-skipped no-doubles negative
+        // contract), display blank text boxes so the user can type without first
+        // having to clear leading zeros.
+        bool blankZeros = !vm.EditHandHasRawInputs;
+
         void Set(string name, int value)
         {
-            if (FindName(name) is TextBox tb) tb.Text = value.ToString();
+            if (FindName(name) is TextBox tb)
+                tb.Text = (blankZeros && value == 0) ? "" : value.ToString();
         }
 
         Set("EditNum0", vm.EditInputs[0]);

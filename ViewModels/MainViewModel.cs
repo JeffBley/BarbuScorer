@@ -61,6 +61,45 @@ public class MainViewModel : INotifyPropertyChanged, IDisposable
     /// <summary>Number of contracts each dealer must deal in a full game.</summary>
     public const int ContractsPerDealer = 7;
 
+    /// <summary>
+    /// Per-user folder where .barbu save files live (%AppData%\Barbu).
+    /// On first access, migrates any .barbu files left in the app's BaseDirectory.
+    /// </summary>
+    public static string SavesDirectory
+    {
+        get
+        {
+            var dir = System.IO.Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                "Barbu");
+            if (!System.IO.Directory.Exists(dir))
+            {
+                System.IO.Directory.CreateDirectory(dir);
+            }
+            if (!_savesMigrated)
+            {
+                _savesMigrated = true;
+                try
+                {
+                    var legacyDir = AppDomain.CurrentDomain.BaseDirectory;
+                    if (!string.Equals(legacyDir, dir, StringComparison.OrdinalIgnoreCase)
+                        && System.IO.Directory.Exists(legacyDir))
+                    {
+                        foreach (var src in System.IO.Directory.GetFiles(legacyDir, "*.barbu"))
+                        {
+                            var dest = System.IO.Path.Combine(dir, System.IO.Path.GetFileName(src));
+                            if (!System.IO.File.Exists(dest))
+                                System.IO.File.Copy(src, dest);
+                        }
+                    }
+                }
+                catch { /* best-effort migration */ }
+            }
+            return dir;
+        }
+    }
+    private static bool _savesMigrated;
+
     private GameScreen _currentScreen = GameScreen.PlayerSetup;
     private GamePhase _currentPhase = GamePhase.SelectingContract;
     private Player? _currentDealer;
@@ -139,6 +178,21 @@ public class MainViewModel : INotifyPropertyChanged, IDisposable
         set { _selectedSettingsTab = value; OnPropertyChanged(); }
     }
 
+    // How to Play panel
+    private bool _isHowToPlayOpen;
+    public bool IsHowToPlayOpen
+    {
+        get => _isHowToPlayOpen;
+        set { _isHowToPlayOpen = value; OnPropertyChanged(); }
+    }
+
+    private int _selectedHowToPlayTab;
+    public int SelectedHowToPlayTab
+    {
+        get => _selectedHowToPlayTab;
+        set { _selectedHowToPlayTab = value; OnPropertyChanged(); }
+    }
+
     private int _selectedMainTab;
     public int SelectedMainTab
     {
@@ -156,6 +210,7 @@ public class MainViewModel : INotifyPropertyChanged, IDisposable
             _selectedTextSize = value; 
             OnPropertyChanged(); 
             OnPropertyChanged(nameof(BaseFontSize));
+            OnPropertyChanged(nameof(TinyFontSize));
             OnPropertyChanged(nameof(SmallFontSize));
             OnPropertyChanged(nameof(MediumFontSize));
             OnPropertyChanged(nameof(LargeFontSize));
@@ -197,6 +252,65 @@ public class MainViewModel : INotifyPropertyChanged, IDisposable
         }
     }
 
+    private bool _allowNonDealerDoublesInPositive = false;
+    /// <summary>When true, non-dealers may double other non-dealers during positive
+    /// contracts (Trumps, Fan Tan, Chinese Poker). When false (default), non-dealers
+    /// can only double the dealer in those contracts.</summary>
+    public bool AllowNonDealerDoublesInPositive
+    {
+        get => _allowNonDealerDoublesInPositive;
+        set
+        {
+            if (_allowNonDealerDoublesInPositive == value) return;
+            _allowNonDealerDoublesInPositive = value;
+            OnPropertyChanged();
+            // Refresh per-cell restrictions on any open matrix so the UI reflects the new rule.
+            ApplyNonDealerRestriction(DoublingMatrix, CurrentDealer, SelectedContract);
+            SaveSettings();
+        }
+    }
+
+    private bool _skipNegativeContractOnNoDoubles = true;
+    /// <summary>When true (default), confirming bidding with zero doubles on a
+    /// negative contract auto-distributes the contract's check total among the
+    /// non-dealers and skips straight to the score summary.</summary>
+    public bool SkipNegativeContractOnNoDoubles
+    {
+        get => _skipNegativeContractOnNoDoubles;
+        set
+        {
+            if (_skipNegativeContractOnNoDoubles == value) return;
+            _skipNegativeContractOnNoDoubles = value;
+            OnPropertyChanged();
+            SaveSettings();
+        }
+    }
+
+    /// <summary>True for contracts where players gain points (Trumps, Fan Tan, Chinese Poker).</summary>
+    private static bool IsPositiveContract(ContractType? type) =>
+        type is ContractType.Trumps or ContractType.FanTan or ContractType.ChinesePoker;
+
+    /// <summary>Apply the "non-dealers may only double the dealer in positive contracts"
+    /// restriction to every cell of the given matrix.</summary>
+    private void ApplyNonDealerRestriction(
+        System.Collections.Generic.IEnumerable<DoublingMatrixRow> matrix,
+        Player? dealer,
+        ContractType? contract)
+    {
+        if (dealer == null) return;
+        bool restrict = IsPositiveContract(contract) && !_allowNonDealerDoublesInPositive;
+        foreach (var row in matrix)
+        {
+            foreach (var cell in row.Cells)
+            {
+                if (cell.IsEmpty) { cell.IsRestricted = false; continue; }
+                cell.IsRestricted = restrict
+                    && cell.Doubler.Index != dealer.Index
+                    && cell.Target.Index != dealer.Index;
+            }
+        }
+    }
+
     private GameMode _gameMode = GameMode.Standard;
     public GameMode GameMode
     {
@@ -221,6 +335,7 @@ public class MainViewModel : INotifyPropertyChanged, IDisposable
             RefreshContractOptions();
             // Refresh scorecard names (e.g. "No Last Two" \u2194 "No Last Trick")
             RefreshScorecardNames();
+            RefreshHowToPlayNames();
             OnPropertyChanged(nameof(TotalRounds));
             OnPropertyChanged(nameof(ContractsPerDealerForMode));
             OnPropertyChanged(nameof(ScorecardScale));
@@ -281,6 +396,7 @@ public class MainViewModel : INotifyPropertyChanged, IDisposable
                 option.RefreshName();
             }
             RefreshScorecardNames();
+            RefreshHowToPlayNames();
             SaveSettings();
         }
     }
@@ -295,6 +411,32 @@ public class MainViewModel : INotifyPropertyChanged, IDisposable
     {
         get => BarbuVersion == BarbuVersion.Modern;
         set { if (value) BarbuVersion = BarbuVersion.Modern; }
+    }
+
+    // ── How To Play tab labels (track Contract Names + Salade mode) ──
+    public string HowToPlayName_Nullo => Contract.GetDisplayName(ContractType.Nullo);
+    public string HowToPlayName_NoQueens => Contract.GetDisplayName(ContractType.NoQueens);
+    public string HowToPlayName_Hearts => Contract.GetDisplayName(ContractType.Hearts);
+    public string HowToPlayName_NoLastTwo => Contract.GetDisplayName(ContractType.NoLastTwo);
+    public string HowToPlayName_Barbu => Contract.GetDisplayName(ContractType.Barbu);
+    public string HowToPlayName_Trumps => Contract.GetDisplayName(ContractType.Trumps);
+    public string HowToPlayName_FanTan => Contract.GetDisplayName(ContractType.FanTan);
+    public string HowToPlayName_RavageCity => Contract.GetDisplayName(ContractType.RavageCity);
+    public string HowToPlayName_ChinesePoker => Contract.GetDisplayName(ContractType.ChinesePoker);
+    public string HowToPlayName_Salade => Contract.GetDisplayName(ContractType.Salade);
+
+    private void RefreshHowToPlayNames()
+    {
+        OnPropertyChanged(nameof(HowToPlayName_Nullo));
+        OnPropertyChanged(nameof(HowToPlayName_NoQueens));
+        OnPropertyChanged(nameof(HowToPlayName_Hearts));
+        OnPropertyChanged(nameof(HowToPlayName_NoLastTwo));
+        OnPropertyChanged(nameof(HowToPlayName_Barbu));
+        OnPropertyChanged(nameof(HowToPlayName_Trumps));
+        OnPropertyChanged(nameof(HowToPlayName_FanTan));
+        OnPropertyChanged(nameof(HowToPlayName_RavageCity));
+        OnPropertyChanged(nameof(HowToPlayName_ChinesePoker));
+        OnPropertyChanged(nameof(HowToPlayName_Salade));
     }
 
     public string FanTanScoringHeader
@@ -595,6 +737,7 @@ public class MainViewModel : INotifyPropertyChanged, IDisposable
     }
 
     // Scaled font sizes
+    public double TinyFontSize => BaseFontSize * 0.65;      // ~9
     public double SmallFontSize => BaseFontSize * 0.78;     // ~11
     public double MediumFontSize => BaseFontSize * 0.86;    // ~12
     public double LargeFontSize => BaseFontSize * 1.14;     // ~16
@@ -617,6 +760,7 @@ public class MainViewModel : INotifyPropertyChanged, IDisposable
             OnPropertyChanged(nameof(GameFlowPanelWidth));
             OnPropertyChanged(nameof(GameFlowMaxWidth));
             OnPropertyChanged(nameof(BaseFontSize));
+            OnPropertyChanged(nameof(TinyFontSize));
             OnPropertyChanged(nameof(SmallFontSize));
             OnPropertyChanged(nameof(MediumFontSize));
             OnPropertyChanged(nameof(LargeFontSize));
@@ -694,6 +838,11 @@ public class MainViewModel : INotifyPropertyChanged, IDisposable
         : "";
 
     public int[] EditInputs { get; } = new int[4];
+
+    /// <summary>True when the hand being edited has real raw input data;
+    /// false when the hand was created via the no-doubles auto-skip and the
+    /// edit popup should display blank text boxes instead of zeros.</summary>
+    public bool EditHandHasRawInputs { get; private set; } = true;
 
     private string? _editErrorMessage;
     public string? EditErrorMessage
@@ -974,6 +1123,24 @@ public class MainViewModel : INotifyPropertyChanged, IDisposable
     public bool IsBidding => CurrentPhase == GamePhase.Bidding;
     public bool IsEnteringScores => CurrentPhase == GamePhase.EnteringScores;
     public bool IsScoreSummary => CurrentPhase == GamePhase.ScoreSummary;
+
+    /// <summary>True when the score summary was reached automatically because
+    /// a negative contract had no doubles. Hides the "Before Doubles" tiles,
+    /// shows the explanatory note, and sends the Back button to the bidding
+    /// matrix instead of the score-input page.</summary>
+    private bool _isBiddingSkippedScoreEntry;
+    public bool IsBiddingSkippedScoreEntry
+    {
+        get => _isBiddingSkippedScoreEntry;
+        set
+        {
+            if (_isBiddingSkippedScoreEntry == value) return;
+            _isBiddingSkippedScoreEntry = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(IsScoreSummaryNotSkipped));
+        }
+    }
+    public bool IsScoreSummaryNotSkipped => !_isBiddingSkippedScoreEntry;
 
     public string GameName
     {
@@ -1285,6 +1452,9 @@ public class MainViewModel : INotifyPropertyChanged, IDisposable
     public ICommand CancelOverwriteSaveAsCommand { get; }
     public ICommand LoadGameCommand { get; }
     public ICommand OpenGameSettingsCommand { get; }
+    public ICommand OpenHowToPlayCommand { get; }
+    public ICommand CloseHowToPlayCommand { get; }
+    public ICommand SelectHowToPlayTabCommand { get; }
     public ICommand CloseSettingsCommand { get; }
     public ICommand DiscardSettingsCommand { get; }
     public ICommand ConfirmDiscardSettingsCommand { get; }
@@ -1362,6 +1532,9 @@ public class MainViewModel : INotifyPropertyChanged, IDisposable
         CancelOverwriteSaveAsCommand = new RelayCommand(() => { ShowOverwriteSaveAsPrompt = false; _pendingSaveAsPath = null; _pendingSaveAsName = null; });
         LoadGameCommand = new RelayCommand(LoadGame);
         OpenGameSettingsCommand = new RelayCommand(OpenGameSettings);
+        OpenHowToPlayCommand = new RelayCommand(() => { IsSettingsMenuOpen = false; SelectedHowToPlayTab = 0; IsHowToPlayOpen = true; });
+        CloseHowToPlayCommand = new RelayCommand(() => IsHowToPlayOpen = false);
+        SelectHowToPlayTabCommand = new RelayCommand<string>(tabStr => { if (int.TryParse(tabStr, out int tab)) SelectedHowToPlayTab = tab; });
         CloseSettingsCommand = new RelayCommand(() => { _settingsSnapshot = null; IsSettingsOpen = false; });
         DiscardSettingsCommand = new RelayCommand(TryDiscardSettings);
         ConfirmDiscardSettingsCommand = new RelayCommand(ConfirmDiscardSettings);
@@ -1473,6 +1646,8 @@ public class MainViewModel : INotifyPropertyChanged, IDisposable
         var settings = AppSettings.Load();
         _selectedTextSize = settings.TextSize;
         _dealerAllowedToDouble = settings.DealerAllowedToDouble;
+        _allowNonDealerDoublesInPositive = settings.AllowNonDealerDoublesInPositive;
+        _skipNegativeContractOnNoDoubles = settings.SkipNegativeContractOnNoDoubles;
         _gameMode = GameMode.Standard;
         _barbuVersion = settings.BarbuVersion;
         _ravageCityEnabled = false;
@@ -1535,6 +1710,8 @@ public class MainViewModel : INotifyPropertyChanged, IDisposable
         {
             TextSize = SelectedTextSize,
             DealerAllowedToDouble = DealerAllowedToDouble,
+            AllowNonDealerDoublesInPositive = AllowNonDealerDoublesInPositive,
+            SkipNegativeContractOnNoDoubles = SkipNegativeContractOnNoDoubles,
             BarbuVersion = BarbuVersion,
             FanTanScore1st = FanTanScore1st,
             FanTanScore2nd = FanTanScore2nd,
@@ -1667,7 +1844,7 @@ public class MainViewModel : INotifyPropertyChanged, IDisposable
 
         try
         {
-            var dir = System.IO.Path.GetDirectoryName(target.FilePath) ?? AppDomain.CurrentDomain.BaseDirectory;
+            var dir = System.IO.Path.GetDirectoryName(target.FilePath) ?? SavesDirectory;
             var sanitized = string.Join("_", newName.Split(System.IO.Path.GetInvalidFileNameChars()));
             var newPath = System.IO.Path.Combine(dir, $"{sanitized}.barbu");
 
@@ -1734,7 +1911,7 @@ public class MainViewModel : INotifyPropertyChanged, IDisposable
 
         try
         {
-            var appDir = AppDomain.CurrentDomain.BaseDirectory;
+            var appDir = SavesDirectory;
             var sanitizedName = string.Join("_", name.Split(System.IO.Path.GetInvalidFileNameChars()));
             var newPath = System.IO.Path.Combine(appDir, $"{sanitizedName}.barbu");
 
@@ -1802,7 +1979,7 @@ public class MainViewModel : INotifyPropertyChanged, IDisposable
         SavedGames.Clear();
         try
         {
-            var appDir = AppDomain.CurrentDomain.BaseDirectory;
+            var appDir = SavesDirectory;
             var saveFiles = System.IO.Directory.GetFiles(appDir, "*.barbu");
             
             foreach (var filePath in saveFiles)
@@ -1930,6 +2107,8 @@ public class MainViewModel : INotifyPropertyChanged, IDisposable
             // Save settings with game
             TextSize = SelectedTextSize.ToString(),
             DealerAllowedToDouble = DealerAllowedToDouble,
+            AllowNonDealerDoublesInPositive = AllowNonDealerDoublesInPositive,
+            SkipNegativeContractOnNoDoubles = SkipNegativeContractOnNoDoubles,
             GameMode = GameMode.ToString(),
             BarbuVersion = BarbuVersion.ToString(),
             RavageCityEnabled = RavageCityEnabled,
@@ -2026,8 +2205,8 @@ public class MainViewModel : INotifyPropertyChanged, IDisposable
         
         try
         {
-            // Get the app directory
-            var appDir = AppDomain.CurrentDomain.BaseDirectory;
+            // Get the per-user saves directory
+            var appDir = SavesDirectory;
             
             // Sanitize the game name for use as a filename
             var sanitizedName = string.Join("_", GameName.Split(System.IO.Path.GetInvalidFileNameChars()));
@@ -2122,6 +2301,8 @@ public class MainViewModel : INotifyPropertyChanged, IDisposable
         if (Enum.TryParse<TextSize>(data.TextSize, out var textSize))
             _selectedTextSize = textSize;
         _dealerAllowedToDouble = data.DealerAllowedToDouble;
+        _allowNonDealerDoublesInPositive = data.AllowNonDealerDoublesInPositive;
+        _skipNegativeContractOnNoDoubles = data.SkipNegativeContractOnNoDoubles;
         if (Enum.TryParse<GameMode>(data.GameMode, out var gameMode))
             _gameMode = gameMode;
         if (Enum.TryParse<BarbuVersion>(data.BarbuVersion, out var barbuVersion))
@@ -2147,6 +2328,8 @@ public class MainViewModel : INotifyPropertyChanged, IDisposable
         // Notify UI of settings changes
         OnPropertyChanged(nameof(SelectedTextSize));
         OnPropertyChanged(nameof(DealerAllowedToDouble));
+        OnPropertyChanged(nameof(AllowNonDealerDoublesInPositive));
+        OnPropertyChanged(nameof(SkipNegativeContractOnNoDoubles));
         OnPropertyChanged(nameof(RavageCityEnabled));
         OnPropertyChanged(nameof(ChinesePokerEnabled));
         OnPropertyChanged(nameof(FanTanScore1st));
@@ -2215,6 +2398,25 @@ public class MainViewModel : INotifyPropertyChanged, IDisposable
         if (CurrentPhase == GamePhase.EnteringScores && SelectedContract.HasValue)
         {
             UpdateScorecardDoublesOnly();
+        }
+
+        // If the save was made right after Confirm Bidding with no doubles on a
+        // negative contract, redirect into the auto-distribute Score Summary
+        // instead of the legacy score-input page. Mirrors the live
+        // ConfirmBiddingMatrix shortcut and also rescues older saves that landed
+        // on the legacy ScoreSummary page with zero inputs.
+        //
+        // We also run this when the saved phase is already ScoreSummary even if
+        // the SkipNegativeContractOnNoDoubles setting is currently OFF, because
+        // the user clearly accepted the skip when they saved — otherwise the
+        // score tiles would be all zeros and confirming would corrupt the game.
+        if (SelectedContract.HasValue
+            && BiddingState.Doubles.Count == 0
+            && IsNegativeContract(SelectedContract.Value)
+            && (CurrentPhase == GamePhase.ScoreSummary
+                || (CurrentPhase == GamePhase.EnteringScores && SkipNegativeContractOnNoDoubles)))
+        {
+            TryAutoDistributeUndoubledNegative();
         }
         
         // Save settings so they persist
@@ -2290,6 +2492,8 @@ public class MainViewModel : INotifyPropertyChanged, IDisposable
     {
         TextSize = SelectedTextSize,
         DealerAllowedToDouble = DealerAllowedToDouble,
+        AllowNonDealerDoublesInPositive = AllowNonDealerDoublesInPositive,
+        SkipNegativeContractOnNoDoubles = SkipNegativeContractOnNoDoubles,
         GameMode = GameMode,
         BarbuVersion = BarbuVersion,
         RavageCityEnabled = RavageCityEnabled,
@@ -2309,6 +2513,8 @@ public class MainViewModel : INotifyPropertyChanged, IDisposable
         if (_settingsSnapshot is not AppSettings s) return false;
         return s.TextSize != SelectedTextSize
             || s.DealerAllowedToDouble != DealerAllowedToDouble
+            || s.AllowNonDealerDoublesInPositive != AllowNonDealerDoublesInPositive
+            || s.SkipNegativeContractOnNoDoubles != SkipNegativeContractOnNoDoubles
             || s.GameMode != GameMode
             || s.BarbuVersion != BarbuVersion
             || s.RavageCityEnabled != RavageCityEnabled
@@ -2343,6 +2549,8 @@ public class MainViewModel : INotifyPropertyChanged, IDisposable
             // Revert each property to its snapshot value. Each setter will re-save settings.
             SelectedTextSize = s.TextSize;
             DealerAllowedToDouble = s.DealerAllowedToDouble;
+            AllowNonDealerDoublesInPositive = s.AllowNonDealerDoublesInPositive;
+            SkipNegativeContractOnNoDoubles = s.SkipNegativeContractOnNoDoubles;
             GameMode = s.GameMode;
             BarbuVersion = s.BarbuVersion;
             RavageCityEnabled = s.RavageCityEnabled;
@@ -2420,6 +2628,7 @@ public class MainViewModel : INotifyPropertyChanged, IDisposable
 
     private void PrefillEditInputsFromHand(HandResult hand)
     {
+        EditHandHasRawInputs = hand.HasRawInputs;
         for (int i = 0; i < 4; i++) EditInputs[i] = hand.RawInputs.Length > i ? hand.RawInputs[i] : 0;
 
         if (hand.SaladeTricks != null) Array.Copy(hand.SaladeTricks, EditSaladeTricks, 4);
@@ -2485,7 +2694,7 @@ public class MainViewModel : INotifyPropertyChanged, IDisposable
                 {
                     Doubler = cell.Doubler,
                     Target = cell.Target,
-                    IsRedoubled = cell.EffectiveRedouble
+                    IsRedoubled = cell.IsRedouble
                 });
             }
         }
@@ -2544,6 +2753,7 @@ public class MainViewModel : INotifyPropertyChanged, IDisposable
 
         // Apply the candidate fields onto the stored hand.
         hand.RawInputs = candidate.RawInputs;
+        hand.HasRawInputs = true;
         hand.Doubles = candidate.Doubles;
         hand.AceOfHeartsPlayerIndex = candidate.AceOfHeartsPlayerIndex;
         hand.KingOfHeartsPlayerIndex = candidate.KingOfHeartsPlayerIndex;
@@ -2558,9 +2768,8 @@ public class MainViewModel : INotifyPropertyChanged, IDisposable
         hand.ChinesePokerTotalInputs = candidate.ChinesePokerTotalInputs;
         hand.PlayerScores = newFinal;
 
-        // Refresh the scorecard cells.
-        for (int i = 0; i < 4; i++)
-            RowBeingEdited.PlayerCells[i].Score = newFinal[i];
+        // Refresh the scorecard cells (scores AND doubler/redouble icons).
+        UpdateScorecardFromHand(hand);
 
         // Doubles may have changed, so refresh the persistent dealer-doubles tracker.
         RebuildDealerDoubleMatrixFromHistory();
@@ -2707,6 +2916,9 @@ public class MainViewModel : INotifyPropertyChanged, IDisposable
             row.IsDealer = doubler.Index == dealer.Index;
             EditDoublingMatrix.Add(row);
         }
+
+        // Apply the "non-dealers may only double the dealer in positive contracts" restriction.
+        ApplyNonDealerRestriction(EditDoublingMatrix, dealer, hand.Contract);
 
         // Wire up inverse cells for the same UX as live bidding.
         foreach (var row in EditDoublingMatrix)
@@ -3138,6 +3350,9 @@ public class MainViewModel : INotifyPropertyChanged, IDisposable
             DoublingMatrix.Add(row);
         }
 
+        // Apply the "non-dealers may only double the dealer in positive contracts" restriction.
+        ApplyNonDealerRestriction(DoublingMatrix, dealer, SelectedContract);
+
         // Wire up inverse-cell relationships so each cell knows about its mirror
         // (e.g., cell[A][B] <-> cell[B][A]). Used to enforce: if A doubles B, then
         // B's row → A's column shows only Re-Dbl, not Dbl.
@@ -3165,7 +3380,7 @@ public class MainViewModel : INotifyPropertyChanged, IDisposable
 
     private void ConfirmBiddingMatrix()
     {
-        if (CurrentDealer == null) return;
+        if (CurrentDealer == null || !SelectedContract.HasValue) return;
 
         // Validate any mandatory cells were not unchecked.
         foreach (var row in DoublingMatrix)
@@ -3204,7 +3419,120 @@ public class MainViewModel : INotifyPropertyChanged, IDisposable
         foreach (var p in Players) BiddingState.PlayersWhoHaveDoubled.Add(p);
 
         ErrorMessage = "";
+
+        // Negative-contract shortcut: if no one doubled, skip the score-input page
+        // and split the contract's check total among the non-dealers (dealer absorbs
+        // the remainder so all four scores still sum to the check total).
+        if (newDoubles.Count == 0 && SkipNegativeContractOnNoDoubles && TryAutoDistributeUndoubledNegative())
+            return;
+
+        IsBiddingSkippedScoreEntry = false;
         CompleteBidding();
+    }
+
+    /// <summary>Negative contracts where the "no doubles -> auto-split" shortcut applies.</summary>
+    private static bool IsNegativeContract(ContractType type) => type is
+        ContractType.Nullo or ContractType.Hearts or ContractType.NoQueens or
+        ContractType.NoLastTwo or ContractType.Barbu or ContractType.RavageCity or
+        ContractType.Salade;
+
+    /// <summary>Returns the contract's expected check total for the current game
+    /// mode (Standard / Ravage City / Chinese Poker / Salade). Mirrors
+    /// <see cref="CardGameScorer.Models.ScorecardRow.ExpectedCheckSum"/> but only
+    /// for negative contracts.</summary>
+    private int? GetNegativeContractCheckTotal(ContractType contract)
+    {
+        if (IsSaladeMode)
+        {
+            return contract switch
+            {
+                ContractType.Nullo => -65,
+                ContractType.NoQueens => -80,
+                ContractType.Hearts => -130,
+                ContractType.NoLastTwo => -30,
+                ContractType.Barbu => -50,
+                ContractType.Salade => -355,
+                _ => null
+            };
+        }
+        if (ChinesePokerEnabled)
+        {
+            return contract switch
+            {
+                ContractType.Nullo => -39,
+                ContractType.NoQueens => -32,
+                ContractType.Hearts => -30,
+                ContractType.NoLastTwo => -35,
+                ContractType.Barbu => -30,
+                ContractType.RavageCity => -36,
+                _ => null
+            };
+        }
+        if (RavageCityEnabled)
+        {
+            return contract switch
+            {
+                ContractType.Nullo => -39,
+                ContractType.NoQueens => -32,
+                ContractType.Hearts => -30,
+                ContractType.NoLastTwo => -30,
+                ContractType.Barbu => -21,
+                ContractType.RavageCity => -24,
+                _ => null
+            };
+        }
+        return contract switch
+        {
+            ContractType.Nullo => -26,
+            ContractType.NoQueens => -24,
+            ContractType.Hearts => -30,
+            ContractType.NoLastTwo => -30,
+            ContractType.Barbu => -20,
+            _ => null
+        };
+    }
+
+    /// <summary>If the selected contract is negative and has a known check total,
+    /// distribute it among non-dealers (integer division) with the remainder going
+    /// to the dealer, jump straight to the Score Summary, and return true.</summary>
+    private bool TryAutoDistributeUndoubledNegative()
+    {
+        if (CurrentDealer == null || !SelectedContract.HasValue) return false;
+        if (!IsNegativeContract(SelectedContract.Value)) return false;
+        var pool = GetNegativeContractCheckTotal(SelectedContract.Value);
+        if (!pool.HasValue) return false;
+
+        int total = pool.Value;
+        int perNonDealer = total / 3;             // C# truncates toward zero (e.g. -26/3 == -8)
+        int dealerScore = total - perNonDealer * 3; // remainder, e.g. -26 - (-24) == -2
+
+        for (int i = 0; i < 4; i++)
+        {
+            int score = (Players[i].Index == CurrentDealer.Index) ? dealerScore : perNonDealer;
+            SummaryBaseScores[i] = score;
+            SummaryFinalScores[i] = score;
+        }
+
+        // Clear/rebuild the (mostly empty) explanation so any stale text doesn't show.
+        ScoringExplanation.Clear();
+        ScoringExplanation.Add("No doubles \u2014 round skipped.");
+        ScoringExplanation.Add($"{total} points split among non-dealers ({perNonDealer} each); dealer gets the {dealerScore} remainder.");
+        ShowScoringExplanation = false;
+
+        OnPropertyChanged(nameof(SummaryBaseScores));
+        OnPropertyChanged(nameof(SummaryFinalScores));
+        OnPropertyChanged(nameof(ScoringExplanation));
+
+        IsBiddingSkippedScoreEntry = true;
+        IsInRedoublePhase = false;
+        IsWaitingForImmediateRedouble = false;
+        CurrentBiddingPlayer = null;
+        CurrentPendingRedouble = null;
+        CurrentPhase = GamePhase.ScoreSummary;
+        StatusMessage = "";
+        UpdateScorecardDoublesOnly();
+        AutoSave();
+        return true;
     }
 
     private void SetupDoubleTargetsForCurrentBidder()
@@ -3698,6 +4026,7 @@ public class MainViewModel : INotifyPropertyChanged, IDisposable
             Dealer = CurrentDealer,
             Contract = SelectedContract.Value,
             RawInputs = (int[])CurrentInputs.Clone(),
+            HasRawInputs = !IsBiddingSkippedScoreEntry,
             Doubles = BiddingState.Doubles.ToList(),
             AceOfHeartsPlayerIndex = AceOfHeartsPlayer?.Index,
             KingOfHeartsPlayerIndex = KingOfHeartsPlayer?.Index,
@@ -3774,6 +4103,9 @@ public class MainViewModel : INotifyPropertyChanged, IDisposable
         
         // Auto-save after confirming scores
         AutoSave();
+
+        // Clear the auto-skip flag so the next hand starts in normal mode.
+        IsBiddingSkippedScoreEntry = false;
     }
 
     private void BackToScoreInput()
@@ -3800,7 +4132,12 @@ public class MainViewModel : INotifyPropertyChanged, IDisposable
                 BackToBiddingMatrix();
                 break;
             case GamePhase.ScoreSummary:
-                BackToScoreInput();
+                // If we skipped score entry (no-doubles negative contract), go all
+                // the way back to the bidding matrix instead of the score-input page.
+                if (IsBiddingSkippedScoreEntry)
+                    BackToBiddingMatrix();
+                else
+                    BackToScoreInput();
                 break;
         }
     }
@@ -3812,6 +4149,7 @@ public class MainViewModel : INotifyPropertyChanged, IDisposable
         // matrix selections so the user can simply tweak them.
         ShowRestartBiddingConfirm = false;
         ErrorMessage = "";
+        IsBiddingSkippedScoreEntry = false;
         CurrentPhase = GamePhase.Bidding;
         IsInRedoublePhase = false;
         IsWaitingForImmediateRedouble = false;
@@ -4091,8 +4429,8 @@ public class MainViewModel : INotifyPropertyChanged, IDisposable
                 break;
 
             case ContractType.NoQueens:
-                // Salade: -20 per queen. Otherwise -12 (CP), -8 (RC), -6 (standard).
-                int queenMultiplier = IsSaladeMode ? -20 : (ChinesePokerEnabled ? -12 : (RavageCityEnabled ? -8 : -6));
+                // Salade: -20 per queen. Otherwise -8 (CP or RC), -6 (standard).
+                int queenMultiplier = IsSaladeMode ? -20 : ((ChinesePokerEnabled || RavageCityEnabled) ? -8 : -6);
                 for (int i = 0; i < 4; i++)
                     scores[i] = queenMultiplier * inputs[i];
                 break;
@@ -4105,9 +4443,9 @@ public class MainViewModel : INotifyPropertyChanged, IDisposable
                         scores[i] = -10 * inputs[i];
                     break;
                 }
-                // -3 per heart, -9 for Ace with Chinese Poker; -2 per heart, -6 for Ace otherwise
-                int heartMultiplier = ChinesePokerEnabled ? -3 : -2;
-                int aceValue = ChinesePokerEnabled ? -9 : -6;
+                // Hearts scoring is the same in standard, Ravage City, and Chinese Poker modes.
+                int heartMultiplier = -2;
+                int aceValue = -6;
                 for (int i = 0; i < 4; i++)
                 {
                     scores[i] = heartMultiplier * inputs[i];  // per heart (not including Ace)
@@ -4126,9 +4464,9 @@ public class MainViewModel : INotifyPropertyChanged, IDisposable
                     }
                     break;
                 }
-                // -25 for last, -15 for 2nd last with Chinese Poker; -20/-10 otherwise
+                // -25 for last with Chinese Poker; -20 for last otherwise. 2nd to last is -10 in all modes.
                 int lastPenalty = ChinesePokerEnabled ? -25 : -20;
-                int secondLastPenalty = ChinesePokerEnabled ? -15 : -10;
+                int secondLastPenalty = -10;
                 for (int i = 0; i < 4; i++)
                 {
                     scores[i] = 0;
@@ -4223,14 +4561,14 @@ public class MainViewModel : INotifyPropertyChanged, IDisposable
                 break;
                 
             case ContractType.ChinesePoker:
-                // +6 per beat, scored by setting (Front/Middle/Back) or total beats
+                // +4 per beat, scored by setting (Front/Middle/Back) or total beats
                 if (ChinesePokerScoreBySetting)
                 {
                     // Sum beats from all three settings (Front, Middle, Back)
                     for (int i = 0; i < 4; i++)
                     {
                         int totalBeats = ChinesePokerSettingInputs[i, 0] + ChinesePokerSettingInputs[i, 1] + ChinesePokerSettingInputs[i, 2];
-                        scores[i] = 6 * totalBeats;
+                        scores[i] = 4 * totalBeats;
                     }
                 }
                 else
@@ -4238,7 +4576,7 @@ public class MainViewModel : INotifyPropertyChanged, IDisposable
                     // Score by total beats
                     for (int i = 0; i < 4; i++)
                     {
-                        scores[i] = 6 * ChinesePokerTotalInputs[i];
+                        scores[i] = 4 * ChinesePokerTotalInputs[i];
                     }
                 }
                 break;

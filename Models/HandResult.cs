@@ -7,6 +7,10 @@ public class HandResult
     public ContractType Contract { get; set; }
     public int[] PlayerScores { get; set; } = new int[4];
     public int[] RawInputs { get; set; } = new int[4];
+    /// <summary>False when this hand was scored without ever entering raw inputs
+    /// (e.g. a negative contract auto-skipped because no one doubled). Causes the
+    /// Edit popup to display blank text boxes instead of zeros.</summary>
+    public bool HasRawInputs { get; set; } = true;
     public List<DoubleBid> Doubles { get; set; } = new();
 
     // --- Per-contract raw inputs needed to faithfully re-edit a hand later ---

@@ -9,7 +9,7 @@
         xmlns:sys="clr-namespace:System;assembly=mscorlib"
         mc:Ignorable="d"
         Title="Barbu Scorer" Height="750" Width="1000"
-        Icon="Assets/BarbuPhoto.png"
+        Icon="Assets/BarbuImage.png"
         WindowState="Maximized"
         Background="#1e1e2e"
         FontSize="{Binding BaseFontSize}"
@@ -282,19 +282,19 @@
         <!-- ==================== PLAYER SETUP SCREEN ==================== -->
         <Grid Visibility="{Binding IsSetupScreen, Converter={StaticResource BoolToVis}}">
             <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-            <Border Background="#313244" CornerRadius="15" Padding="40" 
+            <Border Background="#313244" CornerRadius="15" Padding="40,12,40,18" 
                     HorizontalAlignment="Center" VerticalAlignment="Center"
-                    MinWidth="500" Margin="20">
+                    MinWidth="500" Margin="20,2">
                 <StackPanel Grid.IsSharedSizeScope="True">
-                    <Image Source="Assets/BarbuPhoto.png" Width="120" Height="120" 
-                           HorizontalAlignment="Center" Margin="0,0,0,15"/>
+                    <Image Source="Assets/BarbuImage.png" Width="200" Height="200" 
+                           HorizontalAlignment="Center" Margin="0,0,0,2"/>
                     <TextBlock Text="Barbu Scorer" FontSize="{Binding TitleFontSize}" FontWeight="Bold" 
-                               Foreground="#cdd6f4" HorizontalAlignment="Center" Margin="0,0,0,10"/>
+                               Foreground="#cdd6f4" HorizontalAlignment="Center" Margin="0,0,0,2"/>
                     <TextBlock Text="Enter player names for each position" 
-                               Foreground="#a6adc8" HorizontalAlignment="Center" Margin="0,0,0,30"/>
+                               Foreground="#a6adc8" HorizontalAlignment="Center" Margin="0,0,0,10"/>
                     
                     <!-- Game name input -->
-                    <Grid Margin="0,0,0,25">
+                    <Grid Margin="0,0,0,12">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto" SharedSizeGroup="SetupLabel"/>
                             <ColumnDefinition Width="*"/>
@@ -305,18 +305,18 @@
                     </Grid>
                     
                     <!-- Player name inputs -->
-                    <Grid Margin="0,0,0,20">
+                    <Grid Margin="0,0,0,10">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto" SharedSizeGroup="SetupLabel"/>
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="15"/>
+                            <RowDefinition Height="8"/>
                             <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="15"/>
+                            <RowDefinition Height="8"/>
                             <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="15"/>
+                            <RowDefinition Height="8"/>
                             <RowDefinition Height="Auto"/>
                         </Grid.RowDefinitions>
                         
@@ -339,9 +339,9 @@
                     
                     <TextBlock Text="{Binding GameTypeDisplay}" HorizontalAlignment="Center"
                                Foreground="#cdd6f4" FontWeight="SemiBold"
-                               FontSize="{Binding LargeFontSize}" Margin="0,0,0,15"/>
+                               FontSize="{Binding LargeFontSize}" Margin="0,0,0,8"/>
 
-                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,20,0,0">
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,8,0,0">
                         <Button Content="Start Game" Command="{Binding StartGameCommand}" 
                                 Margin="0,0,15,0"
                                 IsEnabled="{Binding CanStartGame}"/>
@@ -352,7 +352,7 @@
                     </StackPanel>
                     
                     <TextBlock Text="First round is West's game. Bidding starts with North (clockwise)." 
-                               Foreground="#6c7086" HorizontalAlignment="Center" Margin="0,20,0,0"
+                               Foreground="#6c7086" HorizontalAlignment="Center" Margin="0,10,0,0"
                                FontSize="{Binding MediumFontSize}"/>
                 </StackPanel>
             </Border>
@@ -517,6 +517,31 @@
                                 </Button>
                                 <Border Height="1" Background="#45475a" Margin="5,3"/>
                                 <Button Content="Game Settings" Command="{Binding OpenGameSettingsCommand}"
+                                        HorizontalContentAlignment="Left" Padding="10,8"
+                                        BorderThickness="0">
+                                    <Button.Style>
+                                        <Style TargetType="Button">
+                                            <Setter Property="Background" Value="Transparent"/>
+                                            <Setter Property="Foreground" Value="#cdd6f4"/>
+                                            <Setter Property="Template">
+                                                <Setter.Value>
+                                                    <ControlTemplate TargetType="Button">
+                                                        <Border Background="{TemplateBinding Background}" Padding="{TemplateBinding Padding}">
+                                                            <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"/>
+                                                        </Border>
+                                                    </ControlTemplate>
+                                                </Setter.Value>
+                                            </Setter>
+                                            <Style.Triggers>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter Property="Background" Value="#89b4fa"/>
+                                                    <Setter Property="Foreground" Value="#1e1e2e"/>
+                                                </Trigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Button.Style>
+                                </Button>
+                                <Button Content="How To Play" Command="{Binding OpenHowToPlayCommand}"
                                         HorizontalContentAlignment="Left" Padding="10,8"
                                         BorderThickness="0">
                                     <Button.Style>
@@ -871,7 +896,7 @@
                                                                             VerticalAlignment="Center"
                                                                             Visibility="{Binding IsNotEmpty, Converter={StaticResource BoolToVis}}">
                                                                     <StackPanel Orientation="Vertical" VerticalAlignment="Top" Margin="0,0,18,0"
-                                                                                Visibility="{Binding IsNotDealerRowLocked, Converter={StaticResource BoolToVis}}">
+                                                                                Visibility="{Binding IsDoubleVisible, Converter={StaticResource BoolToVis}}">
                                                                         <CheckBox Style="{StaticResource BidCheckBoxStyle}"
                                                                                   IsChecked="{Binding IsDouble, Mode=TwoWay}"
                                                                                   IsEnabled="{Binding IsDoubleEnabled}"
@@ -1049,7 +1074,7 @@
                             <!-- Chinese Poker scoring input -->
                             <StackPanel Visibility="{Binding IsChinesePokerContract, Converter={StaticResource BoolToVis}}"
                                         Margin="0,0,0,15">
-                                <TextBlock Text="Enter Chinese Poker beats (+6 points per beat)" 
+                                <TextBlock Text="Enter Chinese Poker beats (+4 points per beat)" 
                                            FontSize="{Binding LargeFontSize}" 
                                            FontWeight="Bold" Foreground="#cdd6f4" Margin="0,0,0,15" TextWrapping="Wrap"/>
                                 
@@ -1067,6 +1092,7 @@
                                 
                                 <!-- Score by Setting mode: 4 players × 3 columns (Front/Middle/Back) -->
                                 <Grid Visibility="{Binding ChinesePokerScoreBySetting, Converter={StaticResource BoolToVis}}" 
+                                      KeyboardNavigation.TabNavigation="Local"
                                       Margin="0,0,0,10">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="Auto" MinWidth="100"/>
@@ -1090,27 +1116,27 @@
                                     
                                     <!-- Player 1 -->
                                     <TextBlock Grid.Row="1" Grid.Column="0" Text="{Binding Players[0].DisplayName}" VerticalAlignment="Center" Margin="0,0,10,5"/>
-                                    <TextBox Grid.Row="1" Grid.Column="1" x:Name="CPSetting00" Tag="0,0" Width="60" TextAlignment="Center" Margin="5,2"/>
-                                    <TextBox Grid.Row="1" Grid.Column="2" x:Name="CPSetting01" Tag="0,1" Width="60" TextAlignment="Center" Margin="5,2"/>
-                                    <TextBox Grid.Row="1" Grid.Column="3" x:Name="CPSetting02" Tag="0,2" Width="60" TextAlignment="Center" Margin="5,2"/>
+                                    <TextBox Grid.Row="1" Grid.Column="1" x:Name="CPSetting00" Tag="0,0" TabIndex="1" Width="60" TextAlignment="Center" Margin="5,2"/>
+                                    <TextBox Grid.Row="1" Grid.Column="2" x:Name="CPSetting01" Tag="0,1" TabIndex="5" Width="60" TextAlignment="Center" Margin="5,2"/>
+                                    <TextBox Grid.Row="1" Grid.Column="3" x:Name="CPSetting02" Tag="0,2" TabIndex="9" Width="60" TextAlignment="Center" Margin="5,2"/>
                                     
                                     <!-- Player 2 -->
                                     <TextBlock Grid.Row="2" Grid.Column="0" Text="{Binding Players[1].DisplayName}" VerticalAlignment="Center" Margin="0,0,10,5"/>
-                                    <TextBox Grid.Row="2" Grid.Column="1" x:Name="CPSetting10" Tag="1,0" Width="60" TextAlignment="Center" Margin="5,2"/>
-                                    <TextBox Grid.Row="2" Grid.Column="2" x:Name="CPSetting11" Tag="1,1" Width="60" TextAlignment="Center" Margin="5,2"/>
-                                    <TextBox Grid.Row="2" Grid.Column="3" x:Name="CPSetting12" Tag="1,2" Width="60" TextAlignment="Center" Margin="5,2"/>
+                                    <TextBox Grid.Row="2" Grid.Column="1" x:Name="CPSetting10" Tag="1,0" TabIndex="2" Width="60" TextAlignment="Center" Margin="5,2"/>
+                                    <TextBox Grid.Row="2" Grid.Column="2" x:Name="CPSetting11" Tag="1,1" TabIndex="6" Width="60" TextAlignment="Center" Margin="5,2"/>
+                                    <TextBox Grid.Row="2" Grid.Column="3" x:Name="CPSetting12" Tag="1,2" TabIndex="10" Width="60" TextAlignment="Center" Margin="5,2"/>
                                     
                                     <!-- Player 3 -->
                                     <TextBlock Grid.Row="3" Grid.Column="0" Text="{Binding Players[2].DisplayName}" VerticalAlignment="Center" Margin="0,0,10,5"/>
-                                    <TextBox Grid.Row="3" Grid.Column="1" x:Name="CPSetting20" Tag="2,0" Width="60" TextAlignment="Center" Margin="5,2"/>
-                                    <TextBox Grid.Row="3" Grid.Column="2" x:Name="CPSetting21" Tag="2,1" Width="60" TextAlignment="Center" Margin="5,2"/>
-                                    <TextBox Grid.Row="3" Grid.Column="3" x:Name="CPSetting22" Tag="2,2" Width="60" TextAlignment="Center" Margin="5,2"/>
+                                    <TextBox Grid.Row="3" Grid.Column="1" x:Name="CPSetting20" Tag="2,0" TabIndex="3" Width="60" TextAlignment="Center" Margin="5,2"/>
+                                    <TextBox Grid.Row="3" Grid.Column="2" x:Name="CPSetting21" Tag="2,1" TabIndex="7" Width="60" TextAlignment="Center" Margin="5,2"/>
+                                    <TextBox Grid.Row="3" Grid.Column="3" x:Name="CPSetting22" Tag="2,2" TabIndex="11" Width="60" TextAlignment="Center" Margin="5,2"/>
                                     
                                     <!-- Player 4 -->
                                     <TextBlock Grid.Row="4" Grid.Column="0" Text="{Binding Players[3].DisplayName}" VerticalAlignment="Center" Margin="0,0,10,5"/>
-                                    <TextBox Grid.Row="4" Grid.Column="1" x:Name="CPSetting30" Tag="3,0" Width="60" TextAlignment="Center" Margin="5,2"/>
-                                    <TextBox Grid.Row="4" Grid.Column="2" x:Name="CPSetting31" Tag="3,1" Width="60" TextAlignment="Center" Margin="5,2"/>
-                                    <TextBox Grid.Row="4" Grid.Column="3" x:Name="CPSetting32" Tag="3,2" Width="60" TextAlignment="Center" Margin="5,2"/>
+                                    <TextBox Grid.Row="4" Grid.Column="1" x:Name="CPSetting30" Tag="3,0" TabIndex="4" Width="60" TextAlignment="Center" Margin="5,2"/>
+                                    <TextBox Grid.Row="4" Grid.Column="2" x:Name="CPSetting31" Tag="3,1" TabIndex="8" Width="60" TextAlignment="Center" Margin="5,2"/>
+                                    <TextBox Grid.Row="4" Grid.Column="3" x:Name="CPSetting32" Tag="3,2" TabIndex="12" Width="60" TextAlignment="Center" Margin="5,2"/>
                                 </Grid>
                                 <TextBlock Visibility="{Binding ChinesePokerScoreBySetting, Converter={StaticResource BoolToVis}}"
                                            Text="Each column (Front/Middle/Back) must sum to 6 beats" 
@@ -1316,6 +1342,46 @@
                                     Visibility="{Binding IsScoreSummary, Converter={StaticResource BoolToVis}}">
                             <TextBlock Text="Score Summary" FontSize="{Binding XLargeFontSize}" FontWeight="SemiBold" 
                                        Foreground="#cdd6f4" Margin="0,0,0,15"/>
+
+                            <!-- Auto-skip note: shown only when bidding produced no doubles on a negative contract -->
+                            <Border Background="#1e2436" BorderBrush="#89b4fa" BorderThickness="1" CornerRadius="6"
+                                    Padding="14,10" Margin="0,0,0,15"
+                                    Visibility="{Binding IsBiddingSkippedScoreEntry, Converter={StaticResource BoolToVis}}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="No doubles. Round is skipped and points are divided among non-dealers as evenly as possible."
+                                               Foreground="#cdd6f4" FontSize="{Binding BaseFontSize}" TextWrapping="Wrap" VerticalAlignment="Center"/>
+                                    <ToggleButton x:Name="SkipNoDoublesInfoToggle" Margin="8,0,0,0" VerticalAlignment="Center"
+                                                  Background="Transparent" BorderThickness="0" Padding="0" Cursor="Hand"
+                                                  ToolTip="More info">
+                                        <ToggleButton.Template>
+                                            <ControlTemplate TargetType="ToggleButton">
+                                                <Border Background="{TemplateBinding Background}" CornerRadius="999">
+                                                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                </Border>
+                                            </ControlTemplate>
+                                        </ToggleButton.Template>
+                                        <Border Background="#89b4fa" CornerRadius="999"
+                                                Width="{Binding BaseFontSize}" Height="{Binding BaseFontSize}">
+                                            <TextBlock Text="i" Foreground="#1e1e2e" FontWeight="Bold" FontStyle="Italic"
+                                                       HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                       FontSize="{Binding SmallFontSize}"/>
+                                        </Border>
+                                    </ToggleButton>
+                                    <Popup PlacementTarget="{Binding ElementName=SkipNoDoublesInfoToggle}" Placement="Bottom"
+                                           IsOpen="{Binding IsChecked, ElementName=SkipNoDoublesInfoToggle}"
+                                           StaysOpen="False" AllowsTransparency="True" PopupAnimation="Fade">
+                                        <Border Background="#1e1e2e" BorderBrush="#89b4fa" BorderThickness="1" CornerRadius="6"
+                                                Padding="12" MaxWidth="360" Margin="0,4,0,0">
+                                            <Border.Effect>
+                                                <DropShadowEffect BlurRadius="10" ShadowDepth="2" Opacity="0.5"/>
+                                            </Border.Effect>
+                                            <TextBlock Foreground="#cdd6f4" TextWrapping="Wrap"
+                                                       FontSize="{Binding BaseFontSize}"
+                                                       Text="This can be disabled in Game Settings &gt; Optional Rules"/>
+                                        </Border>
+                                    </Popup>
+                                </StackPanel>
+                            </Border>
                             
                             <!-- Player Score Tiles - 4 in a row, collapsing to 2x2 (W/N top, E/S bottom) -->
                             <UniformGrid Columns="4" Margin="0,0,0,15" x:Name="ScoreTilesGrid">
@@ -1323,7 +1389,8 @@
                                 <Border Background="#313244" CornerRadius="10" Padding="20" Margin="0,0,10,10" MinWidth="140">
                                     <StackPanel>
                                         <TextBlock Text="{Binding Players[0].Name}" FontSize="{Binding LargeFontSize}" FontWeight="Bold" Foreground="#cdd6f4"/>
-                                        <StackPanel Margin="0,10,0,0">
+                                        <StackPanel Margin="0,10,0,0"
+                                                    Visibility="{Binding IsScoreSummaryNotSkipped, Converter={StaticResource BoolToVis}}">
                                             <TextBlock Text="Before Doubles" FontSize="{Binding SmallFontSize}" Foreground="#6c7086"/>
                                             <TextBlock Text="{Binding SummaryBaseScores[0]}" FontSize="{Binding XXLargeFontSize}" Foreground="#a6adc8"/>
                                         </StackPanel>
@@ -1338,7 +1405,8 @@
                                 <Border Background="#313244" CornerRadius="10" Padding="20" Margin="0,0,10,10" MinWidth="140">
                                     <StackPanel>
                                         <TextBlock Text="{Binding Players[1].Name}" FontSize="{Binding LargeFontSize}" FontWeight="Bold" Foreground="#cdd6f4"/>
-                                        <StackPanel Margin="0,10,0,0">
+                                        <StackPanel Margin="0,10,0,0"
+                                                    Visibility="{Binding IsScoreSummaryNotSkipped, Converter={StaticResource BoolToVis}}">
                                             <TextBlock Text="Before Doubles" FontSize="{Binding SmallFontSize}" Foreground="#6c7086"/>
                                             <TextBlock Text="{Binding SummaryBaseScores[1]}" FontSize="{Binding XXLargeFontSize}" Foreground="#a6adc8"/>
                                         </StackPanel>
@@ -1353,7 +1421,8 @@
                                 <Border Background="#313244" CornerRadius="10" Padding="20" Margin="0,0,10,10" MinWidth="140">
                                     <StackPanel>
                                         <TextBlock Text="{Binding Players[2].Name}" FontSize="{Binding LargeFontSize}" FontWeight="Bold" Foreground="#cdd6f4"/>
-                                        <StackPanel Margin="0,10,0,0">
+                                        <StackPanel Margin="0,10,0,0"
+                                                    Visibility="{Binding IsScoreSummaryNotSkipped, Converter={StaticResource BoolToVis}}">
                                             <TextBlock Text="Before Doubles" FontSize="{Binding SmallFontSize}" Foreground="#6c7086"/>
                                             <TextBlock Text="{Binding SummaryBaseScores[2]}" FontSize="{Binding XXLargeFontSize}" Foreground="#a6adc8"/>
                                         </StackPanel>
@@ -1368,7 +1437,8 @@
                                 <Border Background="#313244" CornerRadius="10" Padding="20" Margin="0,0,10,10" MinWidth="140">
                                     <StackPanel>
                                         <TextBlock Text="{Binding Players[3].Name}" FontSize="{Binding LargeFontSize}" FontWeight="Bold" Foreground="#cdd6f4"/>
-                                        <StackPanel Margin="0,10,0,0">
+                                        <StackPanel Margin="0,10,0,0"
+                                                    Visibility="{Binding IsScoreSummaryNotSkipped, Converter={StaticResource BoolToVis}}">
                                             <TextBlock Text="Before Doubles" FontSize="{Binding SmallFontSize}" Foreground="#6c7086"/>
                                             <TextBlock Text="{Binding SummaryBaseScores[3]}" FontSize="{Binding XXLargeFontSize}" Foreground="#a6adc8"/>
                                         </StackPanel>
@@ -1762,8 +1832,8 @@
                                                                             </TextBlock>
                                                                             </Button>
                                                                             <ToggleButton x:Name="MostRecentMarker"
-                                                                                          HorizontalAlignment="Right" VerticalAlignment="Top"
-                                                                                          Margin="0,-2,-2,0" Padding="0"
+                                                                                          HorizontalAlignment="Right" VerticalAlignment="Center"
+                                                                                          Margin="0,0,2,0" Padding="0"
                                                                                           Background="Transparent" BorderThickness="0" Cursor="Hand"
                                                                                           ToolTip="Most recent completed contract"
                                                                                           Visibility="{Binding IsMostRecent, Converter={StaticResource BoolToVis}}">
@@ -2343,7 +2413,7 @@
                                                     </Border.Effect>
                                                     <TextBlock Foreground="#cdd6f4" TextWrapping="Wrap"
                                                                FontSize="{Binding SmallFontSize}"
-                                                               Text="Organize your hand into 3 settings (Front/Middle/Back) making poker hands. For each setting you gain +6 points per player your hand beats (+108 points total). Scoring of other games is adjusted to maintain zero sum game."/>
+                                                               Text="Organize your hand into 3 settings (Front/Middle/Back) making poker hands. For each setting you gain +4 points per player your hand beats (+72 points total). Scoring of other games is adjusted to maintain zero sum game."/>
                                                 </Border>
                                             </Popup>
                                         </StackPanel>
@@ -2365,6 +2435,14 @@
                                                   IsChecked="{Binding DealerAllowedToDouble, Mode=TwoWay}"/>
                                         <TextBlock Text="When unchecked, the dealer cannot double other players but may only redouble." 
                                                    Foreground="#6c7086" FontSize="{Binding MediumFontSize}" Margin="25,5,0,0" TextWrapping="Wrap"/>
+                                        <CheckBox Content="Double non-dealers for positive contracts" Foreground="#cdd6f4" FontSize="{Binding BaseFontSize}"
+                                                  IsChecked="{Binding AllowNonDealerDoublesInPositive, Mode=TwoWay}" Margin="0,12,0,0"/>
+                                        <TextBlock Text="When unchecked, during positive contracts (Trumps, Fan Tan, Chinese Poker) non-dealers can only double the dealer."
+                                                   Foreground="#6c7086" FontSize="{Binding MediumFontSize}" Margin="25,5,0,0" TextWrapping="Wrap"/>
+                                        <CheckBox Content="Skip negative contracts when no doubles" Foreground="#cdd6f4" FontSize="{Binding BaseFontSize}"
+                                                  IsChecked="{Binding SkipNegativeContractOnNoDoubles, Mode=TwoWay}" Margin="0,12,0,0"/>
+                                        <TextBlock Text="When checked (default), confirming bidding with no doubles on a negative contract (Nullo, Hearts, No Queens, No Last Two, Barbu, Ravage City, Salade) skips score entry and splits the contract's check total among the non-dealers (the dealer absorbs the remainder)."
+                                                   Foreground="#6c7086" FontSize="{Binding MediumFontSize}" Margin="25,5,0,0" TextWrapping="Wrap"/>
                                     </StackPanel>
                                 </StackPanel>
                             </Grid>
@@ -2382,6 +2460,271 @@
                     </Grid>
                 </Border>
             </Grid>
+        
+        <!-- How To Play Panel Overlay -->
+        <Grid Visibility="{Binding IsHowToPlayOpen, Converter={StaticResource BoolToVis}}">
+            <Border Background="#80000000"/>
+            <Border Background="#313244" CornerRadius="12"
+                    VerticalAlignment="Center" HorizontalAlignment="Center"
+                    Width="980" Height="700"
+                    BorderBrush="#45475a" BorderThickness="1">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- How To Play Sidebar -->
+                    <Border Grid.Column="0" Background="#45475a" CornerRadius="12,0,0,12" MinWidth="220">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+
+                            <TextBlock Grid.Row="0" Text="How To Play" FontSize="{Binding XLargeFontSize}" FontWeight="Bold"
+                                       Foreground="#cdd6f4" Margin="20,20,20,15"/>
+
+                            <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+                                <StackPanel>
+                                    <Button Content="General Rules" Command="{Binding SelectHowToPlayTabCommand}" CommandParameter="0"
+                                            Background="{Binding SelectedHowToPlayTab, Converter={StaticResource TabSelectedConverter}, ConverterParameter=0}"
+                                            Style="{StaticResource SettingsTabButtonStyle}"/>
+                                    <Button Content="{Binding HowToPlayName_Nullo}" Command="{Binding SelectHowToPlayTabCommand}" CommandParameter="1"
+                                            Background="{Binding SelectedHowToPlayTab, Converter={StaticResource TabSelectedConverter}, ConverterParameter=1}"
+                                            Style="{StaticResource SettingsTabButtonStyle}"/>
+                                    <Button Content="{Binding HowToPlayName_NoQueens}" Command="{Binding SelectHowToPlayTabCommand}" CommandParameter="2"
+                                            Background="{Binding SelectedHowToPlayTab, Converter={StaticResource TabSelectedConverter}, ConverterParameter=2}"
+                                            Style="{StaticResource SettingsTabButtonStyle}"/>
+                                    <Button Content="{Binding HowToPlayName_Hearts}" Command="{Binding SelectHowToPlayTabCommand}" CommandParameter="3"
+                                            Background="{Binding SelectedHowToPlayTab, Converter={StaticResource TabSelectedConverter}, ConverterParameter=3}"
+                                            Style="{StaticResource SettingsTabButtonStyle}"/>
+                                    <Button Content="{Binding HowToPlayName_NoLastTwo}" Command="{Binding SelectHowToPlayTabCommand}" CommandParameter="4"
+                                            Background="{Binding SelectedHowToPlayTab, Converter={StaticResource TabSelectedConverter}, ConverterParameter=4}"
+                                            Style="{StaticResource SettingsTabButtonStyle}"/>
+                                    <Button Content="{Binding HowToPlayName_Barbu}" Command="{Binding SelectHowToPlayTabCommand}" CommandParameter="5"
+                                            Background="{Binding SelectedHowToPlayTab, Converter={StaticResource TabSelectedConverter}, ConverterParameter=5}"
+                                            Style="{StaticResource SettingsTabButtonStyle}"/>
+                                    <Button Content="{Binding HowToPlayName_Trumps}" Command="{Binding SelectHowToPlayTabCommand}" CommandParameter="6"
+                                            Background="{Binding SelectedHowToPlayTab, Converter={StaticResource TabSelectedConverter}, ConverterParameter=6}"
+                                            Style="{StaticResource SettingsTabButtonStyle}"/>
+                                    <Button Content="{Binding HowToPlayName_FanTan}" Command="{Binding SelectHowToPlayTabCommand}" CommandParameter="7"
+                                            Background="{Binding SelectedHowToPlayTab, Converter={StaticResource TabSelectedConverter}, ConverterParameter=7}"
+                                            Style="{StaticResource SettingsTabButtonStyle}"/>
+                                    <Button Content="{Binding HowToPlayName_RavageCity}" Command="{Binding SelectHowToPlayTabCommand}" CommandParameter="8"
+                                            Background="{Binding SelectedHowToPlayTab, Converter={StaticResource TabSelectedConverter}, ConverterParameter=8}"
+                                            Style="{StaticResource SettingsTabButtonStyle}"/>
+                                    <Button Content="{Binding HowToPlayName_ChinesePoker}" Command="{Binding SelectHowToPlayTabCommand}" CommandParameter="9"
+                                            Background="{Binding SelectedHowToPlayTab, Converter={StaticResource TabSelectedConverter}, ConverterParameter=9}"
+                                            Style="{StaticResource SettingsTabButtonStyle}"/>
+                                    <Button Content="{Binding HowToPlayName_Salade}" Command="{Binding SelectHowToPlayTabCommand}" CommandParameter="10"
+                                            Background="{Binding SelectedHowToPlayTab, Converter={StaticResource TabSelectedConverter}, ConverterParameter=10}"
+                                            Style="{StaticResource SettingsTabButtonStyle}"/>
+                                </StackPanel>
+                            </ScrollViewer>
+                        </Grid>
+                    </Border>
+
+                    <!-- How To Play Content Area -->
+                    <Grid Grid.Column="1" Margin="25">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="*"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+
+                        <Grid Grid.Row="0" TextElement.FontSize="{Binding TinyFontSize}">
+                            <ScrollViewer Visibility="{Binding SelectedHowToPlayTab, Converter={StaticResource TabVisibilityConverter}, ConverterParameter=0}" VerticalScrollBarVisibility="Auto">
+                                <StackPanel>
+                                    <TextBlock Text="General Rules" FontSize="{Binding LargeFontSize}" FontWeight="Bold" Foreground="#cdd6f4" Margin="0,0,0,12"/>
+
+                                    <TextBlock Text="Overview" FontSize="{Binding MediumFontSize}" FontWeight="SemiBold" Foreground="#cdd6f4" Margin="0,0,0,4"/>
+                                    <TextBlock TextWrapping="Wrap" Foreground="#cdd6f4" Margin="0,0,0,10"
+                                               Text="Barbu (French for &#x2018;The Bearded One&#x2019; referring to the King of Hearts) is a 4&#x2011;player trick&#x2011;taking game played with a standard 52&#x2011;card deck (Ace is high). The game consists of 7 contracts (unique games) for a total of 28 deals. Each player, when its their turn to be the dealer, deals 13 cards to each player, looks at their hand, and declares which contract the group will play. Players then complete the &quot;Doubling&quot; bid. Finally, the game is played and then scored including adding and removing points based on doubling."/>
+                                    <TextBlock TextWrapping="Wrap" Foreground="#cdd6f4" Margin="0,0,0,18"
+                                               Text="There are 7 contracts within Barbu. Five of these contracts are 'negative' games where the object is to avoid taking tricks or tricks containing penalty cards. The remaining two contracts are 'positive' games where you want to score as many points as possible."/>
+
+                                    <TextBlock Text="Doubling" FontSize="{Binding MediumFontSize}" FontWeight="SemiBold" Foreground="#cdd6f4" Margin="0,0,0,4"/>
+                                    <TextBlock TextWrapping="Wrap" Foreground="#cdd6f4" Margin="0,0,0,10"
+                                               Text="Players may choose to &quot;double&quot; after the contract is selected, placing a side bet against one or more opponents. A double compares the two players' scores for that hand, awarding the higher scorer the difference and subtracting the same amount from the lower scorer. Anyone who is doubled may redouble, which raises the stakes by doubling the difference between the players' scores before awarding the higher scorer the difference and subtracting the same amount from the lower scorer. Calling &#x201C;Max&#x201D; means doubling every opponent you are allowed to double and redoubling all players who doubled you."/>
+                                    <TextBlock TextWrapping="Wrap" Foreground="#cdd6f4" Margin="16,0,0,4">
+                                        <Run Text="&#x2022;  "/><Run Text="In positive contracts, players may only double the dealer."/>
+                                    </TextBlock>
+                                    <TextBlock TextWrapping="Wrap" Foreground="#cdd6f4" Margin="16,0,0,4">
+                                        <Run Text="&#x2022;  "/><Run Text="The dealer may redouble anyone who doubles them, but cannot initiate a double."/>
+                                    </TextBlock>
+                                    <TextBlock TextWrapping="Wrap" Foreground="#cdd6f4" Margin="16,0,0,4">
+                                        <Run Text="&#x2022;  "/><Run Text="Each player must double the dealer at least twice across that dealer&#x2019;s seven contracts."/>
+                                    </TextBlock>
+                                    <TextBlock TextWrapping="Wrap" Foreground="#cdd6f4" Margin="16,0,0,18">
+                                        <Run Text="&#x2022;  "/><Run Text="If no doubles are made in a negative contract, the hand is skipped and the penalty points are divided among the three non&#x2011;dealers, with the dealer scoring nothing (or +1 if needed for balance)."/>
+                                    </TextBlock>
+
+                                    <TextBlock Text="Play" FontSize="{Binding MediumFontSize}" FontWeight="SemiBold" Foreground="#cdd6f4" Margin="0,0,0,4"/>
+                                    <TextBlock TextWrapping="Wrap" Foreground="#cdd6f4" Margin="0,0,0,18"
+                                               Text="The dealer always leads the first trick and the winner of each trick leads the following trick. Players must follow suit if able, and each trick is won by the highest card of the suit led. There is no trump suit except in the contract Trumps."/>
+
+                                    <TextBlock Text="Scoring" FontSize="{Binding MediumFontSize}" FontWeight="SemiBold" Foreground="#cdd6f4" Margin="0,0,0,4"/>
+                                    <TextBlock TextWrapping="Wrap" Foreground="#cdd6f4" Margin="0,0,0,10"
+                                               Text="Once a round is complete, start by writing each player's base score. Then compare the score of each pair of players who had a double or redouble between them. If there was only a double, take the difference between their scores and add the difference to the higher scoring player, then subtract the same amount from the lower scoring player. If it's a redouble, double the difference before adding/subtracting. Once all the final scores are calculated, add all players' scores together and compare it with the contract's check value. If the two values do not match, then a mistake was made during scoring."/>
+                                </StackPanel>
+                            </ScrollViewer>
+                            <ScrollViewer Visibility="{Binding SelectedHowToPlayTab, Converter={StaticResource TabVisibilityConverter}, ConverterParameter=1}" VerticalScrollBarVisibility="Auto">
+                                <StackPanel>
+                                    <TextBlock Text="{Binding HowToPlayName_Nullo}" FontSize="{Binding LargeFontSize}" FontWeight="Bold" Foreground="#cdd6f4" Margin="0,0,0,12"/>
+                                    <TextBlock TextWrapping="Wrap" Foreground="#cdd6f4"
+                                               Text="The objective is to take as few tricks as possible. Each trick scores -2 points. The total score for checks is -26."/>
+                                </StackPanel>
+                            </ScrollViewer>
+                            <ScrollViewer Visibility="{Binding SelectedHowToPlayTab, Converter={StaticResource TabVisibilityConverter}, ConverterParameter=2}" VerticalScrollBarVisibility="Auto">
+                                <StackPanel>
+                                    <TextBlock Text="{Binding HowToPlayName_NoQueens}" FontSize="{Binding LargeFontSize}" FontWeight="Bold" Foreground="#cdd6f4" Margin="0,0,0,12"/>
+                                    <TextBlock TextWrapping="Wrap" Foreground="#cdd6f4"
+                                               Text="The objective is to avoid taking tricks containing a Queen of any suit. For each Queen taken the player scores -6 points. Once all 4 Queens have been won, the round ends. The total score for checks is -24."/>
+                                </StackPanel>
+                            </ScrollViewer>
+                            <ScrollViewer Visibility="{Binding SelectedHowToPlayTab, Converter={StaticResource TabVisibilityConverter}, ConverterParameter=3}" VerticalScrollBarVisibility="Auto">
+                                <StackPanel>
+                                    <TextBlock Text="{Binding HowToPlayName_Hearts}" FontSize="{Binding LargeFontSize}" FontWeight="Bold" Foreground="#cdd6f4" Margin="0,0,0,12"/>
+                                    <TextBlock TextWrapping="Wrap" Foreground="#cdd6f4"
+                                               Text="The objective is to avoid taking tricks containing any hearts. Each heart taken scores -2 points (except for the Ace which is -6 points). In this contract there is a special rule: Hearts may not be led unless the player has no cards of any other suit remaining. Once all hearts have been played, the round ends. The total score for checks is -30."/>
+                                </StackPanel>
+                            </ScrollViewer>
+                            <ScrollViewer Visibility="{Binding SelectedHowToPlayTab, Converter={StaticResource TabVisibilityConverter}, ConverterParameter=4}" VerticalScrollBarVisibility="Auto">
+                                <StackPanel>
+                                    <TextBlock Text="{Binding HowToPlayName_NoLastTwo}" FontSize="{Binding LargeFontSize}" FontWeight="Bold" Foreground="#cdd6f4" Margin="0,0,0,12"/>
+                                    <TextBlock TextWrapping="Wrap" Foreground="#cdd6f4"
+                                               Text="The objective is to avoid taking the last two tricks. The last trick scores -20 points, the penultimate (2nd to last) trick scores -10 points. The total score for checks is -30."/>
+                                </StackPanel>
+                            </ScrollViewer>
+                            <ScrollViewer Visibility="{Binding SelectedHowToPlayTab, Converter={StaticResource TabVisibilityConverter}, ConverterParameter=5}" VerticalScrollBarVisibility="Auto">
+                                <StackPanel>
+                                    <TextBlock Text="{Binding HowToPlayName_Barbu}" FontSize="{Binding LargeFontSize}" FontWeight="Bold" Foreground="#cdd6f4" Margin="0,0,0,12"/>
+                                    <TextBlock TextWrapping="Wrap" Foreground="#cdd6f4"
+                                               Text="The objective is to avoid taking the trick containing the King of Hearts. Whoever does scores -20 points. In this contract there is a special rule: Hearts may not be led unless the player has no cards of any other suit remaining. Once a player wins a trick containing the King of Hearts, the round ends. The total score for checks is -20."/>
+                                </StackPanel>
+                            </ScrollViewer>
+                            <ScrollViewer Visibility="{Binding SelectedHowToPlayTab, Converter={StaticResource TabVisibilityConverter}, ConverterParameter=6}" VerticalScrollBarVisibility="Auto">
+                                <StackPanel>
+                                    <TextBlock Text="{Binding HowToPlayName_Trumps}" FontSize="{Binding LargeFontSize}" FontWeight="Bold" Foreground="#cdd6f4" Margin="0,0,0,12"/>
+                                    <TextBlock TextWrapping="Wrap" Foreground="#cdd6f4"
+                                               Text="The objective is to win as many tricks as possible. Each trick is worth +5 points. The dealer declares the trump suit. If you cannot follow suit, you must play a trump if able, and if a trump has already been played, you must over&#x2011;trump if able. You are not required to under&#x2011;trump. When a trump is led, you must play a higher trump if able. Each trick is worth 5 points. The total score for checks is +65."/>
+                                </StackPanel>
+                            </ScrollViewer>
+                            <ScrollViewer Visibility="{Binding SelectedHowToPlayTab, Converter={StaticResource TabVisibilityConverter}, ConverterParameter=7}" VerticalScrollBarVisibility="Auto">
+                                <StackPanel>
+                                    <TextBlock Text="{Binding HowToPlayName_FanTan}" FontSize="{Binding LargeFontSize}" FontWeight="Bold" Foreground="#cdd6f4" Margin="0,0,0,12"/>
+                                    <TextBlock TextWrapping="Wrap" Foreground="#cdd6f4"
+                                               Text="The objective is to play all your cards as quickly as possible. The dealer names a starting rank (example: starting with 7's), and on each turn a player must play either a card of that rank or a card one rank higher or lower than any card already played in that suit. If a player cannot play, their turn is skipped. Scoring is based on the order in which players empty their hands: 1st = +40, 2nd = +25, 3rd = +10, 4th = &#x2013;10. However, these values can vary (Example: 45/20/5/-5) and can be edited under Game Settings. The total score for checks is +65."/>
+                                </StackPanel>
+                            </ScrollViewer>
+                            <ScrollViewer Visibility="{Binding SelectedHowToPlayTab, Converter={StaticResource TabVisibilityConverter}, ConverterParameter=8}" VerticalScrollBarVisibility="Auto">
+                                <StackPanel>
+                                    <TextBlock Text="{Binding HowToPlayName_RavageCity}" FontSize="{Binding LargeFontSize}" FontWeight="Bold" Foreground="#cdd6f4" Margin="0,0,0,12"/>
+                                    <TextBlock TextWrapping="Wrap" Foreground="#cdd6f4" Margin="0,0,0,10"
+                                               Text="Ravage City is an optional 8th contract. The objective to not win the most cards in any suit. The player who takes the most cards in any one suit scores -24 points. If two players tie, each scores -12 points. If three players tie, each scores -8 points. If all players tie, each scores -6 points. To maintain zero-sum scoring, the values of the other contracts are modified as follows:"/>
+                                    <TextBlock TextWrapping="Wrap" Foreground="#cdd6f4" Margin="16,0,0,4">
+                                        <Run Text="&#x2022;  "/><Run Text="{Binding HowToPlayName_Nullo, Mode=OneWay}"/><Run Text=": Each trick scores -3 (-39 total)"/>
+                                    </TextBlock>
+                                    <TextBlock TextWrapping="Wrap" Foreground="#cdd6f4" Margin="16,0,0,4">
+                                        <Run Text="&#x2022;  "/><Run Text="{Binding HowToPlayName_Hearts, Mode=OneWay}"/><Run Text=": No change; -2 per heart, -6 for Ace of Hearts (-30 total)"/>
+                                    </TextBlock>
+                                    <TextBlock TextWrapping="Wrap" Foreground="#cdd6f4" Margin="16,0,0,4">
+                                        <Run Text="&#x2022;  "/><Run Text="{Binding HowToPlayName_NoQueens, Mode=OneWay}"/><Run Text=": Each queen scores -8 (-32 total)"/>
+                                    </TextBlock>
+                                    <TextBlock TextWrapping="Wrap" Foreground="#cdd6f4" Margin="16,0,0,4">
+                                        <Run Text="&#x2022;  "/><Run Text="{Binding HowToPlayName_Barbu, Mode=OneWay}"/><Run Text=": King of Hearts scores -21"/>
+                                    </TextBlock>
+                                    <TextBlock TextWrapping="Wrap" Foreground="#cdd6f4" Margin="16,0,0,4">
+                                        <Run Text="&#x2022;  "/><Run Text="No Last Two: No change &#x2013; 2nd to last trick scores -10, last trick scores -20 (-30 total)"/>
+                                    </TextBlock>
+                                    <TextBlock TextWrapping="Wrap" Foreground="#cdd6f4" Margin="16,0,0,4">
+                                        <Run Text="&#x2022;  "/><Run Text="{Binding HowToPlayName_Trumps, Mode=OneWay}"/><Run Text=": Each trick scores +7 (+91 total)"/>
+                                    </TextBlock>
+                                    <TextBlock TextWrapping="Wrap" Foreground="#cdd6f4" Margin="16,0,0,4">
+                                        <Run Text="&#x2022;  "/><Run Text="{Binding HowToPlayName_FanTan, Mode=OneWay}"/><Run Text=": First player out scores +50, second +25, third +10, and fourth scores 0 (+85 total)"/>
+                                    </TextBlock>
+                                </StackPanel>
+                            </ScrollViewer>
+                            <ScrollViewer Visibility="{Binding SelectedHowToPlayTab, Converter={StaticResource TabVisibilityConverter}, ConverterParameter=9}" VerticalScrollBarVisibility="Auto">
+                                <StackPanel>
+                                    <TextBlock Text="{Binding HowToPlayName_ChinesePoker}" FontSize="{Binding LargeFontSize}" FontWeight="Bold" Foreground="#cdd6f4" Margin="0,0,0,12"/>
+                                    <TextBlock TextWrapping="Wrap" Foreground="#cdd6f4" Margin="0,0,0,10"
+                                               Text="Chinese Poker is an optional 9th contract that can be added in addition to Ravage City. The objective is to win the most &quot;beats&quot; which is when your hand beats another player's hand according to standard poker hands. Each beat scores +4 points. Check value is +72 points."/>
+                                    <TextBlock TextWrapping="Wrap" Foreground="#cdd6f4" Margin="0,0,0,10"
+                                               Text="Each player organizes their hands into 3 groups or settings: Front, Middle, and Back. The Front setting is composed of 3 cards while the Middle and Back have 5 cards each. Each setting must be a better poker hand than the previous (Front &lt; Middle &lt; Back)."/>
+                                    <TextBlock Text="Poker Hands (in order from highest to lowest)" FontWeight="SemiBold" Foreground="#cdd6f4" Margin="0,0,0,6"/>
+                                    <TextBlock TextWrapping="Wrap" Foreground="#cdd6f4" Margin="16,0,0,4">
+                                        <Run Text="&#x2022;  " /><Run Text="Royal Flush" FontWeight="SemiBold"/><Run Text=" - An ace high straight flush"/>
+                                    </TextBlock>
+                                    <TextBlock TextWrapping="Wrap" Foreground="#cdd6f4" Margin="16,0,0,4">
+                                        <Run Text="&#x2022;  " /><Run Text="Straight Flush" FontWeight="SemiBold"/><Run Text=" - Five consecutive cards in the same suit"/>
+                                    </TextBlock>
+                                    <TextBlock TextWrapping="Wrap" Foreground="#cdd6f4" Margin="16,0,0,4">
+                                        <Run Text="&#x2022;  " /><Run Text="Four of a Kind" FontWeight="SemiBold"/><Run Text=" - Four cards of the same rank"/>
+                                    </TextBlock>
+                                    <TextBlock TextWrapping="Wrap" Foreground="#cdd6f4" Margin="16,0,0,4">
+                                        <Run Text="&#x2022;  " /><Run Text="Full House" FontWeight="SemiBold"/><Run Text=" - Three cards of the same rank with 2 cards of another same rank"/>
+                                    </TextBlock>
+                                    <TextBlock TextWrapping="Wrap" Foreground="#cdd6f4" Margin="16,0,0,4">
+                                        <Run Text="&#x2022;  " /><Run Text="Flush" FontWeight="SemiBold"/><Run Text=" - Five cards in the same suit (not consecutive)"/>
+                                    </TextBlock>
+                                    <TextBlock TextWrapping="Wrap" Foreground="#cdd6f4" Margin="16,0,0,4">
+                                        <Run Text="&#x2022;  " /><Run Text="Straight" FontWeight="SemiBold"/><Run Text=" - Five consecutive cards of different suits (Aces can count as a high or a low card)"/>
+                                    </TextBlock>
+                                    <TextBlock TextWrapping="Wrap" Foreground="#cdd6f4" Margin="16,0,0,4">
+                                        <Run Text="&#x2022;  " /><Run Text="Three of a Kind" FontWeight="SemiBold"/><Run Text=" - Three cards of the same rank"/>
+                                    </TextBlock>
+                                    <TextBlock TextWrapping="Wrap" Foreground="#cdd6f4" Margin="16,0,0,4">
+                                        <Run Text="&#x2022;  " /><Run Text="Two Pair" FontWeight="SemiBold"/><Run Text=" - Two cards of the same rank together with two cards of another same rank"/>
+                                    </TextBlock>
+                                    <TextBlock TextWrapping="Wrap" Foreground="#cdd6f4" Margin="16,0,0,4">
+                                        <Run Text="&#x2022;  " /><Run Text="One Pair" FontWeight="SemiBold"/><Run Text=" - Two cards of the same rank"/>
+                                    </TextBlock>
+                                    <TextBlock TextWrapping="Wrap" Foreground="#cdd6f4" Margin="16,0,0,10">
+                                        <Run Text="&#x2022;  " /><Run Text="High Card" FontWeight="SemiBold"/><Run Text=" - Five cards of different rank and suit (that do not form any of the above hands). Hands are ranked by comparing the highest value card."/>
+                                    </TextBlock>
+                                    <TextBlock TextWrapping="Wrap" Foreground="#cdd6f4"
+                                               Text="For each setting, compare your hand with each other player. Gain 1 beat for each time your hand beats the hand of another player. 6 beats are available per setting among the players."/>
+                                </StackPanel>
+                            </ScrollViewer>
+                            <ScrollViewer Visibility="{Binding SelectedHowToPlayTab, Converter={StaticResource TabVisibilityConverter}, ConverterParameter=10}" VerticalScrollBarVisibility="Auto">
+                                <StackPanel>
+                                    <TextBlock Text="{Binding HowToPlayName_Salade}" FontSize="{Binding LargeFontSize}" FontWeight="Bold" Foreground="#cdd6f4" Margin="0,0,0,12"/>
+                                    <TextBlock TextWrapping="Wrap" Foreground="#cdd6f4" Margin="0,0,0,10"
+                                               Text="Salade is an additional round played in a variant based on the negative contracts. In this game there are no positive contracts and the five negative contracts are varied slightly as follows, and Salade is a sixth round."/>
+                                    <TextBlock TextWrapping="Wrap" Foreground="#cdd6f4" Margin="16,0,0,4">
+                                        <Run Text="&#x2022;  "/><Run Text="{Binding HowToPlayName_Nullo, Mode=OneWay}"/><Run Text=": Each trick scores -5 (total -65)"/>
+                                    </TextBlock>
+                                    <TextBlock TextWrapping="Wrap" Foreground="#cdd6f4" Margin="16,0,0,4">
+                                        <Run Text="&#x2022;  "/><Run Text="No Last Trick: -30 total (note, only the last trick)"/>
+                                    </TextBlock>
+                                    <TextBlock TextWrapping="Wrap" Foreground="#cdd6f4" Margin="16,0,0,4">
+                                        <Run Text="&#x2022;  "/><Run Text="{Binding HowToPlayName_Hearts, Mode=OneWay}"/><Run Text=": Each hearts score -10 (-130 total)"/>
+                                    </TextBlock>
+                                    <TextBlock TextWrapping="Wrap" Foreground="#cdd6f4" Margin="16,0,0,4">
+                                        <Run Text="&#x2022;  "/><Run Text="{Binding HowToPlayName_NoQueens, Mode=OneWay}"/><Run Text=": Each queen scores -20 (-80 total)"/>
+                                    </TextBlock>
+                                    <TextBlock TextWrapping="Wrap" Foreground="#cdd6f4" Margin="16,0,0,4">
+                                        <Run Text="&#x2022;  "/><Run Text="{Binding HowToPlayName_Barbu, Mode=OneWay}"/><Run Text=": King of Hearts scores -50"/>
+                                    </TextBlock>
+                                    <TextBlock TextWrapping="Wrap" Foreground="#cdd6f4" Margin="16,0,0,10">
+                                        <Run Text="&#x2022;  "/><Run Text="{Binding HowToPlayName_Salade, Mode=OneWay}"/><Run Text=": All of the above, simultaneously (-355 total)"/>
+                                    </TextBlock>
+                                    <TextBlock TextWrapping="Wrap" Foreground="#cdd6f4"
+                                               Text="Barbu with the Salade variant is composed of 24 rounds, with strategy for Salade being critical. This variant is strictly for fun &#x2013; for example, players will gang up on the leader going into the salade, forgetting their own position."/>
+                                </StackPanel>
+                            </ScrollViewer>
+                        </Grid>
+
+                        <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right">
+                            <Button Content="Close" Command="{Binding CloseHowToPlayCommand}"
+                                    Background="#89b4fa" Foreground="#1e1e2e" FontWeight="Bold"
+                                    Padding="20,10"/>
+                        </StackPanel>
+                    </Grid>
+                </Grid>
+            </Border>
+        </Grid>
         
         <!-- Fan Tan Scoring Editor Popup -->
         <Grid Visibility="{Binding ShowFanTanScoringEditor, Converter={StaticResource BoolToVis}}">
@@ -2858,12 +3201,12 @@
             <Border Background="#80000000"/>
             <Border Background="#313244" CornerRadius="12" Padding="20"
                     VerticalAlignment="Center" HorizontalAlignment="Center"
-                    MinWidth="700" MaxWidth="1000" MaxHeight="700"
+                    MinWidth="700" MaxWidth="1000"
                     BorderBrush="#45475a" BorderThickness="1">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
@@ -2875,8 +3218,7 @@
                                    TextWrapping="Wrap" TextAlignment="Center"/>
                     </StackPanel>
 
-                    <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto">
-                        <StackPanel>
+                    <StackPanel Grid.Row="1">
                             <!-- Header row -->
                             <Grid Margin="0,0,0,4">
                                 <Grid.ColumnDefinitions>
@@ -2936,7 +3278,7 @@
                                                                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center"
                                                                             Visibility="{Binding IsNotEmpty, Converter={StaticResource BoolToVis}}">
                                                                     <StackPanel Orientation="Vertical" VerticalAlignment="Top" Margin="0,0,18,0"
-                                                                                Visibility="{Binding IsNotDealerRowLocked, Converter={StaticResource BoolToVis}}">
+                                                                                Visibility="{Binding IsDoubleVisible, Converter={StaticResource BoolToVis}}">
                                                                         <CheckBox Style="{StaticResource BidCheckBoxStyle}"
                                                                                   IsChecked="{Binding IsDouble, Mode=TwoWay}"
                                                                                   IsEnabled="{Binding IsDoubleEnabled}" ToolTip="Double">
@@ -2966,7 +3308,6 @@
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
                         </StackPanel>
-                    </ScrollViewer>
 
                     <TextBlock Grid.Row="2" Text="{Binding EditBidError}" Foreground="#f38ba8"
                                TextWrapping="Wrap" Margin="0,8,0,0" TextAlignment="Center"
@@ -2990,7 +3331,7 @@
             <Border Background="#80000000"/>
             <Border Background="#313244" CornerRadius="12" Padding="20"
                     VerticalAlignment="Center" HorizontalAlignment="Center"
-                    MinWidth="520" MaxWidth="780" MaxHeight="700"
+                    MinWidth="600" MaxWidth="780" MaxHeight="700"
                     BorderBrush="#45475a" BorderThickness="1">
                 <Grid>
                     <Grid.RowDefinitions>
@@ -3010,35 +3351,7 @@
 
                     <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
                         <StackPanel>
-                            <!-- Numeric 4-input panel: Nullo / NoQueens / Hearts / Trumps / FanTan -->
-                            <StackPanel Visibility="{Binding EditShowNumericFour, Converter={StaticResource BoolToVis}}"
-                                        Margin="0,0,0,15">
-                                <TextBlock Text="{Binding EditNumericLabel}" FontWeight="SemiBold"
-                                           Foreground="#cdd6f4" Margin="0,0,0,8"/>
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="*"/>
-                                    </Grid.ColumnDefinitions>
-                                    <Grid.RowDefinitions>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="Auto"/>
-                                    </Grid.RowDefinitions>
-                                    <TextBlock Grid.Row="0" Grid.Column="0" Text="{Binding Players[0].DisplayName}" HorizontalAlignment="Center" Foreground="#cdd6f4" Margin="0,0,0,5"/>
-                                    <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding Players[1].DisplayName}" HorizontalAlignment="Center" Foreground="#cdd6f4" Margin="0,0,0,5"/>
-                                    <TextBlock Grid.Row="0" Grid.Column="2" Text="{Binding Players[2].DisplayName}" HorizontalAlignment="Center" Foreground="#cdd6f4" Margin="0,0,0,5"/>
-                                    <TextBlock Grid.Row="0" Grid.Column="3" Text="{Binding Players[3].DisplayName}" HorizontalAlignment="Center" Foreground="#cdd6f4" Margin="0,0,0,5"/>
-                                    <TextBox Grid.Row="1" Grid.Column="0" x:Name="EditNum0" Width="80" TextAlignment="Center" Padding="6,4" Margin="6,0"/>
-                                    <TextBox Grid.Row="1" Grid.Column="1" x:Name="EditNum1" Width="80" TextAlignment="Center" Padding="6,4" Margin="6,0"/>
-                                    <TextBox Grid.Row="1" Grid.Column="2" x:Name="EditNum2" Width="80" TextAlignment="Center" Padding="6,4" Margin="6,0"/>
-                                    <TextBox Grid.Row="1" Grid.Column="3" x:Name="EditNum3" Width="80" TextAlignment="Center" Padding="6,4" Margin="6,0"/>
-                                </Grid>
-                                <TextBlock Visibility="{Binding EditShowFanTanHelp, Converter={StaticResource BoolToVis}}"
-                                           Text="Enter 1 for first to go out, 2 for second, 3 for third, 4 for last."
-                                           Foreground="#a6adc8" FontStyle="Italic" Margin="0,8,0,0" TextWrapping="Wrap"/>
-                            </StackPanel>
+                            <!-- Pickers first (matches original input flow): Ace -> King -> Last -> 2nd-to-last -->
 
                             <!-- Ace of Hearts picker (Hearts non-Salade) -->
                             <StackPanel Visibility="{Binding EditShowAcePicker, Converter={StaticResource BoolToVis}}" Margin="0,0,0,15">
@@ -3056,6 +3369,14 @@
                                           Background="#e6e9ef" Foreground="#1e1e2e"/>
                             </StackPanel>
 
+                            <!-- 2nd to last trick picker (NoLastTwo only, non-Salade) -->
+                            <StackPanel Visibility="{Binding EditShowSecondToLastPicker, Converter={StaticResource BoolToVis}}" Margin="0,0,0,15">
+                                <TextBlock Text="Player who won the 2nd to last trick:" FontWeight="SemiBold" Foreground="#cdd6f4" Margin="0,0,0,5"/>
+                                <ComboBox ItemsSource="{Binding Players}" SelectedItem="{Binding EditSecondToLastTrickPlayer}"
+                                          DisplayMemberPath="DisplayName" MinWidth="260" HorizontalAlignment="Left"
+                                          Background="#e6e9ef" Foreground="#1e1e2e"/>
+                            </StackPanel>
+
                             <!-- Last trick picker (NoLastTwo / Salade) -->
                             <StackPanel Visibility="{Binding EditShowLastPicker, Converter={StaticResource BoolToVis}}" Margin="0,0,0,15">
                                 <TextBlock Text="Player who won the last trick:" FontWeight="SemiBold" Foreground="#cdd6f4" Margin="0,0,0,5"/>
@@ -3064,12 +3385,34 @@
                                           Background="#e6e9ef" Foreground="#1e1e2e"/>
                             </StackPanel>
 
-                            <!-- 2nd to last trick picker (NoLastTwo only, non-Salade) -->
-                            <StackPanel Visibility="{Binding EditShowSecondToLastPicker, Converter={StaticResource BoolToVis}}" Margin="0,0,0,15">
-                                <TextBlock Text="Player who won the 2nd to last trick:" FontWeight="SemiBold" Foreground="#cdd6f4" Margin="0,0,0,5"/>
-                                <ComboBox ItemsSource="{Binding Players}" SelectedItem="{Binding EditSecondToLastTrickPlayer}"
-                                          DisplayMemberPath="DisplayName" MinWidth="260" HorizontalAlignment="Left"
-                                          Background="#e6e9ef" Foreground="#1e1e2e"/>
+                            <!-- Numeric 4-input panel: Nullo / NoQueens / Hearts / Trumps / FanTan -->
+                            <StackPanel Visibility="{Binding EditShowNumericFour, Converter={StaticResource BoolToVis}}"
+                                        Margin="0,0,0,15">
+                                <TextBlock Text="{Binding EditNumericLabel}" FontWeight="SemiBold"
+                                           Foreground="#cdd6f4" Margin="0,0,0,8"/>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" MinWidth="120"/>
+                                        <ColumnDefinition Width="*" MinWidth="120"/>
+                                        <ColumnDefinition Width="*" MinWidth="120"/>
+                                        <ColumnDefinition Width="*" MinWidth="120"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                    </Grid.RowDefinitions>
+                                    <TextBlock Grid.Row="0" Grid.Column="0" Text="{Binding Players[0].DisplayName}" HorizontalAlignment="Stretch" TextAlignment="Center" TextTrimming="CharacterEllipsis" Foreground="#cdd6f4" Margin="10,0,10,5"/>
+                                    <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding Players[1].DisplayName}" HorizontalAlignment="Stretch" TextAlignment="Center" TextTrimming="CharacterEllipsis" Foreground="#cdd6f4" Margin="10,0,10,5"/>
+                                    <TextBlock Grid.Row="0" Grid.Column="2" Text="{Binding Players[2].DisplayName}" HorizontalAlignment="Stretch" TextAlignment="Center" TextTrimming="CharacterEllipsis" Foreground="#cdd6f4" Margin="10,0,10,5"/>
+                                    <TextBlock Grid.Row="0" Grid.Column="3" Text="{Binding Players[3].DisplayName}" HorizontalAlignment="Stretch" TextAlignment="Center" TextTrimming="CharacterEllipsis" Foreground="#cdd6f4" Margin="10,0,10,5"/>
+                                    <TextBox Grid.Row="1" Grid.Column="0" x:Name="EditNum0" Width="80" TextAlignment="Center" Padding="6,4" Margin="6,0"/>
+                                    <TextBox Grid.Row="1" Grid.Column="1" x:Name="EditNum1" Width="80" TextAlignment="Center" Padding="6,4" Margin="6,0"/>
+                                    <TextBox Grid.Row="1" Grid.Column="2" x:Name="EditNum2" Width="80" TextAlignment="Center" Padding="6,4" Margin="6,0"/>
+                                    <TextBox Grid.Row="1" Grid.Column="3" x:Name="EditNum3" Width="80" TextAlignment="Center" Padding="6,4" Margin="6,0"/>
+                                </Grid>
+                                <TextBlock Visibility="{Binding EditShowFanTanHelp, Converter={StaticResource BoolToVis}}"
+                                           Text="Enter 1 for first to go out, 2 for second, 3 for third, 4 for last."
+                                           Foreground="#a6adc8" FontStyle="Italic" Margin="0,8,0,0" TextWrapping="Wrap"/>
                             </StackPanel>
 
                             <!-- Salade tricks/queens/hearts grid -->
@@ -3134,12 +3477,13 @@
 
                             <!-- Chinese Poker editor -->
                             <StackPanel Visibility="{Binding EditShowChinesePoker, Converter={StaticResource BoolToVis}}" Margin="0,0,0,15">
-                                <TextBlock Text="Chinese Poker beats (+6 per beat)" FontWeight="SemiBold" Foreground="#cdd6f4" Margin="0,0,0,8"/>
+                                <TextBlock Text="Chinese Poker beats (+4 per beat)" FontWeight="SemiBold" Foreground="#cdd6f4" Margin="0,0,0,8"/>
                                 <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
                                     <RadioButton Content="By Setting (F/M/B)" IsChecked="{Binding EditChinesePokerScoreBySetting, Mode=TwoWay}" Margin="0,0,20,0" Foreground="#cdd6f4"/>
                                     <RadioButton Content="By Total Beats" IsChecked="{Binding EditChinesePokerScoreByTotal, Mode=TwoWay}" Foreground="#cdd6f4"/>
                                 </StackPanel>
-                                <Grid Visibility="{Binding EditChinesePokerScoreBySetting, Converter={StaticResource BoolToVis}}">
+                                <Grid Visibility="{Binding EditChinesePokerScoreBySetting, Converter={StaticResource BoolToVis}}"
+                                      KeyboardNavigation.TabNavigation="Local">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="Auto" MinWidth="100"/>
                                         <ColumnDefinition Width="70"/>
@@ -3159,40 +3503,40 @@
                                     <TextBlock Grid.Row="0" Grid.Column="3" Text="Back" FontWeight="Bold" Foreground="#cdd6f4" HorizontalAlignment="Center" Margin="0,0,0,5"/>
 
                                     <TextBlock Grid.Row="1" Grid.Column="0" Text="{Binding Players[0].DisplayName}" Foreground="#cdd6f4" VerticalAlignment="Center" Margin="0,0,10,5"/>
-                                    <TextBox Grid.Row="1" Grid.Column="1" x:Name="EditCP00" Width="50" TextAlignment="Center" Margin="5,2"/>
-                                    <TextBox Grid.Row="1" Grid.Column="2" x:Name="EditCP01" Width="50" TextAlignment="Center" Margin="5,2"/>
-                                    <TextBox Grid.Row="1" Grid.Column="3" x:Name="EditCP02" Width="50" TextAlignment="Center" Margin="5,2"/>
+                                    <TextBox Grid.Row="1" Grid.Column="1" x:Name="EditCP00" TabIndex="1" Width="50" TextAlignment="Center" Margin="5,2"/>
+                                    <TextBox Grid.Row="1" Grid.Column="2" x:Name="EditCP01" TabIndex="5" Width="50" TextAlignment="Center" Margin="5,2"/>
+                                    <TextBox Grid.Row="1" Grid.Column="3" x:Name="EditCP02" TabIndex="9" Width="50" TextAlignment="Center" Margin="5,2"/>
 
                                     <TextBlock Grid.Row="2" Grid.Column="0" Text="{Binding Players[1].DisplayName}" Foreground="#cdd6f4" VerticalAlignment="Center" Margin="0,0,10,5"/>
-                                    <TextBox Grid.Row="2" Grid.Column="1" x:Name="EditCP10" Width="50" TextAlignment="Center" Margin="5,2"/>
-                                    <TextBox Grid.Row="2" Grid.Column="2" x:Name="EditCP11" Width="50" TextAlignment="Center" Margin="5,2"/>
-                                    <TextBox Grid.Row="2" Grid.Column="3" x:Name="EditCP12" Width="50" TextAlignment="Center" Margin="5,2"/>
+                                    <TextBox Grid.Row="2" Grid.Column="1" x:Name="EditCP10" TabIndex="2" Width="50" TextAlignment="Center" Margin="5,2"/>
+                                    <TextBox Grid.Row="2" Grid.Column="2" x:Name="EditCP11" TabIndex="6" Width="50" TextAlignment="Center" Margin="5,2"/>
+                                    <TextBox Grid.Row="2" Grid.Column="3" x:Name="EditCP12" TabIndex="10" Width="50" TextAlignment="Center" Margin="5,2"/>
 
                                     <TextBlock Grid.Row="3" Grid.Column="0" Text="{Binding Players[2].DisplayName}" Foreground="#cdd6f4" VerticalAlignment="Center" Margin="0,0,10,5"/>
-                                    <TextBox Grid.Row="3" Grid.Column="1" x:Name="EditCP20" Width="50" TextAlignment="Center" Margin="5,2"/>
-                                    <TextBox Grid.Row="3" Grid.Column="2" x:Name="EditCP21" Width="50" TextAlignment="Center" Margin="5,2"/>
-                                    <TextBox Grid.Row="3" Grid.Column="3" x:Name="EditCP22" Width="50" TextAlignment="Center" Margin="5,2"/>
+                                    <TextBox Grid.Row="3" Grid.Column="1" x:Name="EditCP20" TabIndex="3" Width="50" TextAlignment="Center" Margin="5,2"/>
+                                    <TextBox Grid.Row="3" Grid.Column="2" x:Name="EditCP21" TabIndex="7" Width="50" TextAlignment="Center" Margin="5,2"/>
+                                    <TextBox Grid.Row="3" Grid.Column="3" x:Name="EditCP22" TabIndex="11" Width="50" TextAlignment="Center" Margin="5,2"/>
 
                                     <TextBlock Grid.Row="4" Grid.Column="0" Text="{Binding Players[3].DisplayName}" Foreground="#cdd6f4" VerticalAlignment="Center" Margin="0,0,10,5"/>
-                                    <TextBox Grid.Row="4" Grid.Column="1" x:Name="EditCP30" Width="50" TextAlignment="Center" Margin="5,2"/>
-                                    <TextBox Grid.Row="4" Grid.Column="2" x:Name="EditCP31" Width="50" TextAlignment="Center" Margin="5,2"/>
-                                    <TextBox Grid.Row="4" Grid.Column="3" x:Name="EditCP32" Width="50" TextAlignment="Center" Margin="5,2"/>
+                                    <TextBox Grid.Row="4" Grid.Column="1" x:Name="EditCP30" TabIndex="4" Width="50" TextAlignment="Center" Margin="5,2"/>
+                                    <TextBox Grid.Row="4" Grid.Column="2" x:Name="EditCP31" TabIndex="8" Width="50" TextAlignment="Center" Margin="5,2"/>
+                                    <TextBox Grid.Row="4" Grid.Column="3" x:Name="EditCP32" TabIndex="12" Width="50" TextAlignment="Center" Margin="5,2"/>
                                 </Grid>
                                 <Grid Visibility="{Binding EditChinesePokerScoreByTotal, Converter={StaticResource BoolToVis}}">
                                     <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="*" MinWidth="120"/>
+                                        <ColumnDefinition Width="*" MinWidth="120"/>
+                                        <ColumnDefinition Width="*" MinWidth="120"/>
+                                        <ColumnDefinition Width="*" MinWidth="120"/>
                                     </Grid.ColumnDefinitions>
                                     <Grid.RowDefinitions>
                                         <RowDefinition Height="Auto"/>
                                         <RowDefinition Height="Auto"/>
                                     </Grid.RowDefinitions>
-                                    <TextBlock Grid.Row="0" Grid.Column="0" Text="{Binding Players[0].DisplayName}" Foreground="#cdd6f4" HorizontalAlignment="Center" Margin="0,0,0,5"/>
-                                    <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding Players[1].DisplayName}" Foreground="#cdd6f4" HorizontalAlignment="Center" Margin="0,0,0,5"/>
-                                    <TextBlock Grid.Row="0" Grid.Column="2" Text="{Binding Players[2].DisplayName}" Foreground="#cdd6f4" HorizontalAlignment="Center" Margin="0,0,0,5"/>
-                                    <TextBlock Grid.Row="0" Grid.Column="3" Text="{Binding Players[3].DisplayName}" Foreground="#cdd6f4" HorizontalAlignment="Center" Margin="0,0,0,5"/>
+                                    <TextBlock Grid.Row="0" Grid.Column="0" Text="{Binding Players[0].DisplayName}" Foreground="#cdd6f4" HorizontalAlignment="Stretch" TextAlignment="Center" TextTrimming="CharacterEllipsis" Margin="10,0,10,5"/>
+                                    <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding Players[1].DisplayName}" Foreground="#cdd6f4" HorizontalAlignment="Stretch" TextAlignment="Center" TextTrimming="CharacterEllipsis" Margin="10,0,10,5"/>
+                                    <TextBlock Grid.Row="0" Grid.Column="2" Text="{Binding Players[2].DisplayName}" Foreground="#cdd6f4" HorizontalAlignment="Stretch" TextAlignment="Center" TextTrimming="CharacterEllipsis" Margin="10,0,10,5"/>
+                                    <TextBlock Grid.Row="0" Grid.Column="3" Text="{Binding Players[3].DisplayName}" Foreground="#cdd6f4" HorizontalAlignment="Stretch" TextAlignment="Center" TextTrimming="CharacterEllipsis" Margin="10,0,10,5"/>
                                     <TextBox Grid.Row="1" Grid.Column="0" x:Name="EditCPTot0" Width="60" TextAlignment="Center" Margin="6,0"/>
                                     <TextBox Grid.Row="1" Grid.Column="1" x:Name="EditCPTot1" Width="60" TextAlignment="Center" Margin="6,0"/>
                                     <TextBox Grid.Row="1" Grid.Column="2" x:Name="EditCPTot2" Width="60" TextAlignment="Center" Margin="6,0"/>

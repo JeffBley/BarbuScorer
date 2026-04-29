@@ -39,10 +39,32 @@ public class DoublingMatrixCell : INotifyPropertyChanged
             _isDealerRowLocked = value;
             OnPropertyChanged();
             OnPropertyChanged(nameof(IsNotDealerRowLocked));
+            OnPropertyChanged(nameof(IsDoubleVisible));
             OnPropertyChanged(nameof(IsDoubleEnabled));
         }
     }
     public bool IsNotDealerRowLocked => !_isDealerRowLocked;
+
+    /// <summary>True when the Dbl checkbox should be hidden because the rule
+    /// "Double non-dealers for positive contracts" is disabled and this cell
+    /// is a non-dealer doubling another non-dealer in a positive contract.</summary>
+    private bool _isRestricted;
+    public bool IsRestricted
+    {
+        get => _isRestricted;
+        set
+        {
+            if (_isRestricted == value) return;
+            _isRestricted = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(IsDoubleVisible));
+            OnPropertyChanged(nameof(IsDoubleEnabled));
+        }
+    }
+
+    /// <summary>The Dbl checkbox is visible only when the cell isn't locked
+    /// for any reason (dealer-row-locked or contract-rule-restricted).</summary>
+    public bool IsDoubleVisible => !_isDealerRowLocked && !_isRestricted;
 
     /// <summary>The mirror cell where the row/column players are swapped. When this cell's
     /// inverse is doubled, this cell's Dbl is disabled and Re-Dbl becomes the only option,
@@ -123,7 +145,7 @@ public class DoublingMatrixCell : INotifyPropertyChanged
     /// the row is the dealer's and dealers aren't allowed to double.</summary>
     public bool IsDoubleEnabled
     {
-        get => _isDoubleEnabled && !IsDealerRowLocked && !(InverseCell?.IsDouble ?? false);
+        get => _isDoubleEnabled && !IsDealerRowLocked && !IsRestricted && !(InverseCell?.IsDouble ?? false);
         set { _isDoubleEnabled = value; OnPropertyChanged(); }
     }
 

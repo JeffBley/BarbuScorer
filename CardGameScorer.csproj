@@ -6,11 +6,11 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
-    <ApplicationIcon>Assets\BarbuPhoto.ico</ApplicationIcon>
+    <ApplicationIcon>Assets\BarbuImage.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>
-    <Resource Include="Assets\BarbuPhoto.png" />
+    <Resource Include="Assets\BarbuImage.png" />
   </ItemGroup>
 
 </Project>

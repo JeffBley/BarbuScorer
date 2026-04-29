@@ -20,6 +20,8 @@ public class GameSaveData
     // Settings saved with game
     public string TextSize { get; set; } = "Medium";
     public bool DealerAllowedToDouble { get; set; } = false;
+    public bool AllowNonDealerDoublesInPositive { get; set; } = false;
+    public bool SkipNegativeContractOnNoDoubles { get; set; } = true;
     public string GameMode { get; set; } = "Standard";
     public string BarbuVersion { get; set; } = "Classic";
     public bool RavageCityEnabled { get; set; } = false;

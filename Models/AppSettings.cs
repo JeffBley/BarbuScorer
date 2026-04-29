@@ -10,6 +10,8 @@ public class AppSettings
 {
     public TextSize TextSize { get; set; } = TextSize.Medium;
     public bool DealerAllowedToDouble { get; set; } = false;
+    public bool AllowNonDealerDoublesInPositive { get; set; } = false;
+    public bool SkipNegativeContractOnNoDoubles { get; set; } = true;
     public GameMode GameMode { get; set; } = GameMode.Standard;
     public BarbuVersion BarbuVersion { get; set; } = BarbuVersion.Classic;
     public bool RavageCityEnabled { get; set; } = false;

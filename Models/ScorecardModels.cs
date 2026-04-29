@@ -134,14 +134,14 @@ public class ScorecardRow : INotifyPropertyChanged
                 return Contract switch
                 {
                     ContractType.Nullo => -39,
-                    ContractType.NoQueens => -48,
-                    ContractType.Hearts => -45,
-                    ContractType.NoLastTwo => -40,
+                    ContractType.NoQueens => -32,
+                    ContractType.Hearts => -30,
+                    ContractType.NoLastTwo => -35,
                     ContractType.Barbu => -30,
                     ContractType.Trumps => 65,
                     ContractType.FanTan => CardGameScorer.Models.Contract.FanTanScoringTotal,
                     ContractType.RavageCity => -36,
-                    ContractType.ChinesePoker => 108,
+                    ContractType.ChinesePoker => 72,
                     _ => null
                 };
             }
